@@ -1,0 +1,4 @@
+app_main.c:6:16:read_reg	40	static
+app_main.c:29:16:write_reg	40	static
+app_main.c:52:13:send_command	16	static
+app_main.c:63:5:app_main	4	static
