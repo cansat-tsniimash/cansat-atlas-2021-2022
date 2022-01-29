@@ -1,4 +1,4 @@
-Application/app_main.o: ../Application/app_main.c \
+Application/nrf24_lower_api.o: ../Application/nrf24_lower_api.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \

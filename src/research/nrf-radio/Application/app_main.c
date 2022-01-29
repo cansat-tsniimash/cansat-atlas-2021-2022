@@ -1,8 +1,10 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <stm32f4xx_hal.h>
+#include "nrf24_lower_api.h"
 
 extern SPI_HandleTypeDef hspi2;
-
+/*
 typedef struct
 {
 	struct
@@ -117,7 +119,7 @@ typedef struct
 		uint8_t	dpl_p0:0;
 	} dynpd;
 }nrf24l01_config_t;
-
+*/
 #define STATUS 0x07
 
 #define CONFIG 0x00
@@ -182,56 +184,7 @@ typedef struct
 #define FEATURE 0x1D
 
 
-
-
-
-
-static uint8_t read_reg(uint8_t reg_addr, uint8_t *reg_data, uint32_t len)
-{
-	// Переменная для значения STATUS регистра
-	uint8_t status;
-
-	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1,  GPIO_PIN_RESET);
-
-	// Добавляем в 5 битов адреса еще 3 бита для чтения из этого регистра
-	reg_addr = reg_addr & ~((1 << 5) | (1 << 6) | (1 << 7));
-
-	// Передаем адресс регистра, который читаем, на шину spi и получаем в ответ значение STATUS регистр
-	HAL_SPI_TransmitReceive(&hspi2, &reg_addr, &status, 1, HAL_MAX_DELAY);
-
-	// Читаем данные
-	HAL_SPI_Receive(&hspi2, reg_data, len, HAL_MAX_DELAY);
-
-	// Поднимаем chip select для того, что бы закончить общение с конкретным устройством.
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1,  GPIO_PIN_SET);
-
-	return status;
-}
-
-static uint8_t write_reg(uint8_t reg_addr, uint8_t *reg_data, uint32_t len)
-{
-	// Переменная для значения STATUS регистра
-	uint8_t status;
-
-	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1,  GPIO_PIN_RESET);
-
-	// Добавляем в 5 битов адреса еще 3 бита для чтения из этого регистра
-	reg_addr = (reg_addr & ~((1 << 6) | (1 << 7))) | (1 << 5);
-
-	// Передаем адресс регистра, который читаем, на шину spi и получаем в ответ значение STATUS регистра
-	HAL_SPI_TransmitReceive(&hspi2, &reg_addr, &status, 1, HAL_MAX_DELAY);
-
-	// Читаем данные
-	HAL_SPI_Transmit(&hspi2, reg_data, len, HAL_MAX_DELAY);
-
-	// Поднимаем chip select для того, что бы закончить общение с конкретным устройством.
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1,  GPIO_PIN_SET);
-
-	return status;
-}
-
+/*
 static void send_command(uint8_t command){
 	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1,  GPIO_PIN_RESET);
@@ -258,16 +211,95 @@ void nrf24l01_get_config(nrf24l01_config_t *nrf_config)
 	read_reg(CONFIG, &reg, 1);
 
 	nrf_config->
-}
+}*/
 
 int app_main()
 {
+	// Работаем по приложению A даташита. Что нужно сделать чтобы передавать
 
+	// в первую очередь настроим модуль
+	// Начнем с конфигурационного регистра
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	uint8_t cfg_reg = 0;
+	cfg_reg &= ~RF24_CONFIG_PRIM_RX; // Будем передатчиком
+	cfg_reg |= RF24_CONFIG_PWR_UP; // Не будем спать
+	cfg_reg |= RF24_CONFIG_EN_CRC; // Будем использовать контрольную сумму
+	cfg_reg &= ~RF24_CONFIG_CRCO;  // 1 байт на контрольную сумму
+	// Прерывания не используем и даже трогать на будем
+	rf24_write_register(RF24_REGADDR_CONFIG, &cfg_reg, 1);
 
+	HAL_Delay(1);
 
+	uint8_t readout_cfg = 0;
+	rf24_read_register(RF24_REGADDR_CONFIG, &readout_cfg, 1);
 
+	// Включаем все FEATURES
+	uint8_t features = 0;
+	features = (1 << 2) | (1 << 1) | (1 << 0);
+	rf24_write_register(RF24_REGADDR_FEATURE, &features, 1);
 
+	// Теперь нужно установить адрес пайпа на который мы будем передавать
+	uint64_t tx_addr = 0x00cadebaba;
+	//rf24_write_register(RF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr), 5); // 5 байт на адрес без доп настроек
 
+	// Выставляем мощность и частоту
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	uint8_t rf_setup = 0;
+	// Скорость на 250 кбит
+	rf_setup |= RF24_RFSETUP_RF_DR_LOW;
+	rf_setup &= ~RF24_RFSETUP_RF_DR_HIGH;
+	// МАКСИМАЛЬНАЯ МОЩНОСТЬ
+	rf_setup &= ~(RF24_RFSETUP_RF_PWR_MASK << RF24_RFSETUP_RF_PWR_OFFSET);
+	//rf_setup |= (0x03 & RF24_RFSETUP_RF_PWR_MASK) << RF24_RFSETUP_RF_PWR_OFFSET;
+	rf24_write_register(RF24_REGADDR_RF_SETUP, &rf_setup, 1);
 
+	// частота считается как 2400 МГц + канал
+	// встанем на 2437 - 6ой канал Wi-Fi
+	uint8_t rf_channel = 41;
+	rf24_write_register(RF24_REGADDR_RF_CH, &rf_channel, 1);
 
+	// по-умолчанию включено аж 2 пайпа на приём и для них включены авто ACK
+	// Сейчас у нас не будет приёмника, поэтому модуль будет отправлять пакет
+	// несколько раз и будет говорить что отправка не удалась.
+	// Ну и фиг с ним!
+
+	int packet_number = 0;
+	rf24_ce_activate(true);
+	while(1)
+	{
+		uint8_t payload[32] = {0};
+
+		// Запишем пайлоад строкой
+		//snprintf(payload, sizeof(payload), "packet no %d", packet_number);
+
+		// загоняем на радио
+		// Мы не включали динамических размеров пейлоада, поэтому гоним целиком 32 байта
+		// с нулями
+		rf24_flush_tx();
+		rf24_write_tx_payload(payload, sizeof(payload), true);
+
+		// дергаем CE на 10мкс чтобы начать передачу.
+		// МЫ не умеем по микросекундам, поэтому дернем на миллисекунду
+		HAL_Delay(10);
+		//rf24_ce_activate(true);
+		HAL_Delay(1);
+		//rf24_ce_activate(false);
+
+		// Подождем сколько-то пока пакет отправляется
+		// Пускай будет 100 мс
+		HAL_Delay(10);
+
+		// TODO: вычитать статус и посмотреть что там происходит
+		volatile uint8_t status;
+		rf24_get_status(&status);
+
+		uint8_t irq_clear = (1 << 6) | (1 << 5) | (1 << 4);
+		//rf24_write_register(RF24_REGADDR_STATUS, &irq_clear, 1);
+
+		HAL_Delay(1);
+		rf24_get_status(&status);
+
+		// Увеличиваем номер пакета
+		packet_number++;
+	}
 }

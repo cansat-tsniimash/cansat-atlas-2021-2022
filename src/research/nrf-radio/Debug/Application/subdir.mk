@@ -5,13 +5,16 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../Application/app_main.c 
+../Application/app_main.c \
+../Application/nrf24_lower_api.c 
 
 OBJS += \
-./Application/app_main.o 
+./Application/app_main.o \
+./Application/nrf24_lower_api.o 
 
 C_DEPS += \
-./Application/app_main.d 
+./Application/app_main.d \
+./Application/nrf24_lower_api.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -21,7 +24,7 @@ Application/%.o: ../Application/%.c Application/subdir.mk
 clean: clean-Application
 
 clean-Application:
-	-$(RM) ./Application/app_main.d ./Application/app_main.o
+	-$(RM) ./Application/app_main.d ./Application/app_main.o ./Application/nrf24_lower_api.d ./Application/nrf24_lower_api.o
 
 .PHONY: clean-Application
 

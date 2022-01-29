@@ -1,4 +1,5 @@
 "./Application/app_main.o"
+"./Application/nrf24_lower_api.o"
 "./Core/Src/main.o"
 "./Core/Src/stm32f4xx_hal_msp.o"
 "./Core/Src/stm32f4xx_it.o"
