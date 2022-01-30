@@ -1,5 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <inttypes.h>
+
 #include <stm32f4xx_hal.h>
 #include "nrf24_lower_api.h"
 
@@ -213,34 +215,40 @@ void nrf24l01_get_config(nrf24l01_config_t *nrf_config)
 	nrf_config->
 }*/
 
+
+static void dump_registers(void);
+//static
+void print_bits(uint8_t value, char * buffer);
+static void print_register(uint8_t reg_addr, uint8_t * reg_data);
+
 int app_main()
 {
 	// Работаем по приложению A даташита. Что нужно сделать чтобы передавать
 
+	HAL_Delay(100);
+
+	printf("starting\n");
+	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
+	dump_registers();
+	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
+	//while(1) {}
+
 	// в первую очередь настроим модуль
-	// Начнем с конфигурационного регистра
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	uint8_t cfg_reg = 0;
-	cfg_reg &= ~RF24_CONFIG_PRIM_RX; // Будем передатчиком
-	cfg_reg |= RF24_CONFIG_PWR_UP; // Не будем спать
-	cfg_reg |= RF24_CONFIG_EN_CRC; // Будем использовать контрольную сумму
-	cfg_reg &= ~RF24_CONFIG_CRCO;  // 1 байт на контрольную сумму
-	// Прерывания не используем и даже трогать на будем
-	rf24_write_register(RF24_REGADDR_CONFIG, &cfg_reg, 1);
-
-	HAL_Delay(1);
-
-	uint8_t readout_cfg = 0;
-	rf24_read_register(RF24_REGADDR_CONFIG, &readout_cfg, 1);
+	// переходим в power down
+	uint8_t config_pd = 0x08;
+	rf24_write_register(RF24_REGADDR_CONFIG, &config_pd, 1);
+	print_register(RF24_REGADDR_CONFIG, &config_pd);
 
 	// Включаем все FEATURES
 	uint8_t features = 0;
 	features = (1 << 2) | (1 << 1) | (1 << 0);
 	rf24_write_register(RF24_REGADDR_FEATURE, &features, 1);
+	print_register(RF24_REGADDR_FEATURE, &features);
 
 	// Теперь нужно установить адрес пайпа на который мы будем передавать
 	uint64_t tx_addr = 0x00cadebaba;
-	//rf24_write_register(RF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr), 5); // 5 байт на адрес без доп настроек
+	rf24_write_register(RF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr), 5); // 5 байт на адрес без доп настроек
+	print_register(RF24_REGADDR_TX_ADDR, &tx_addr);
 
 	// Выставляем мощность и частоту
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -252,19 +260,39 @@ int app_main()
 	rf_setup &= ~(RF24_RFSETUP_RF_PWR_MASK << RF24_RFSETUP_RF_PWR_OFFSET);
 	//rf_setup |= (0x03 & RF24_RFSETUP_RF_PWR_MASK) << RF24_RFSETUP_RF_PWR_OFFSET;
 	rf24_write_register(RF24_REGADDR_RF_SETUP, &rf_setup, 1);
+	print_register(RF24_REGADDR_RF_SETUP, (uint8_t*)&rf_setup);
 
 	// частота считается как 2400 МГц + канал
 	// встанем на 2437 - 6ой канал Wi-Fi
 	uint8_t rf_channel = 41;
 	rf24_write_register(RF24_REGADDR_RF_CH, &rf_channel, 1);
+	print_register(RF24_REGADDR_RF_CH, &rf_channel);
 
 	// по-умолчанию включено аж 2 пайпа на приём и для них включены авто ACK
 	// Сейчас у нас не будет приёмника, поэтому модуль будет отправлять пакет
 	// несколько раз и будет говорить что отправка не удалась.
 	// Ну и фиг с ним!
 
+	// Начнем с конфигурационного регистра
+	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+	uint8_t cfg_reg = 0;
+	cfg_reg &= ~RF24_CONFIG_PRIM_RX; // Будем передатчиком
+	cfg_reg |= RF24_CONFIG_PWR_UP; // Не будем спать
+	cfg_reg |= RF24_CONFIG_EN_CRC; // Будем использовать контрольную сумму
+	cfg_reg &= ~RF24_CONFIG_CRCO;  // 1 байт на контрольную сумму
+	// Прерывания не используем и даже трогать на будем
+	rf24_write_register(RF24_REGADDR_CONFIG, &cfg_reg, 1);
+	print_register(RF24_REGADDR_CONFIG, &cfg_reg);
+
+
+	printf("configured\n");
+	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
+	dump_registers();
+	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
+	//while(1) {}
+
 	int packet_number = 0;
-	rf24_ce_activate(true);
+	//rf24_ce_activate(true);
 	while(1)
 	{
 		uint8_t payload[32] = {0};
@@ -275,31 +303,150 @@ int app_main()
 		// загоняем на радио
 		// Мы не включали динамических размеров пейлоада, поэтому гоним целиком 32 байта
 		// с нулями
-		rf24_flush_tx();
+		//rf24_flush_tx();
 		rf24_write_tx_payload(payload, sizeof(payload), true);
 
 		// дергаем CE на 10мкс чтобы начать передачу.
 		// МЫ не умеем по микросекундам, поэтому дернем на миллисекунду
 		HAL_Delay(10);
-		//rf24_ce_activate(true);
+		rf24_ce_activate(true);
 		HAL_Delay(1);
-		//rf24_ce_activate(false);
+		rf24_ce_activate(false);
 
 		// Подождем сколько-то пока пакет отправляется
 		// Пускай будет 100 мс
 		HAL_Delay(10);
 
 		// TODO: вычитать статус и посмотреть что там происходит
-		volatile uint8_t status;
+		uint8_t status;
+		uint8_t obs_tx;
+
 		rf24_get_status(&status);
+		rf24_read_register(RF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
+		printf("status_before_clear\n");
+		print_register(RF24_REGADDR_STATUS, &status);
+		//print_register(RF24_REGADDR_OBSERVE_TX, &obs_tx);
 
 		uint8_t irq_clear = (1 << 6) | (1 << 5) | (1 << 4);
-		//rf24_write_register(RF24_REGADDR_STATUS, &irq_clear, 1);
+		rf24_write_register(RF24_REGADDR_STATUS, &irq_clear, 1);
 
-		HAL_Delay(1);
 		rf24_get_status(&status);
+		rf24_read_register(RF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
+		printf("status_before_clear\n");
+		print_register(RF24_REGADDR_STATUS, &status);
+		//print_register(RF24_REGADDR_OBSERVE_TX, &obs_tx);
 
 		// Увеличиваем номер пакета
 		packet_number++;
+
+		HAL_Delay(500);
 	}
 }
+
+
+//static
+void print_bits(uint8_t value, char * buffer)
+{
+	for (size_t i = 0; i < sizeof(value)*8; i++)
+	{
+		int bit = value & (0x01 << 7);
+		sprintf(buffer, "%d", bit ? 1 : 0);
+		value = value << 1;
+		buffer += 1;
+	}
+}
+
+
+typedef struct reg_param_t
+{
+	uint8_t addr;
+	const char * name;
+	uint8_t size;
+} reg_param_t;
+
+
+static reg_param_t reg_params[] = {
+	{ RF24_REGADDR_CONFIG, "RF24_REGADDR_CONFIG",			1},
+	{ RF24_REGADDR_EN_AA, "RF24_REGADDR_EN_AA",				1},
+	{ RF24_REGADDR_EN_RXADDR, "RF24_REGADDR_EN_RXADDR",		1},
+	{ RF24_REGADDR_SETUP_AW, "RF24_REGADDR_SETUP_AW",		1},
+	{ RF24_REGADDR_SETUP_RETR, "RF24_REGADDR_SETUP_RETR",	1},
+	{ RF24_REGADDR_RF_CH, "RF24_REGADDR_RF_CH",				1},
+	{ RF24_REGADDR_RF_SETUP, "RF24_REGADDR_RF_SETUP",		1},
+	{ RF24_REGADDR_STATUS, "RF24_REGADDR_STATUS",			1},
+	{ RF24_REGADDR_OBSERVE_TX, "RF24_REGADDR_OBSERVE_TX",	1},
+	{ RF24_REGADDR_RPD, "RF24_REGADDR_RPD",					1},
+	{ RF24_REGADDR_RX_ADDR_P0, "RF24_REGADDR_RX_ADDR_P0",	5},
+	{ RF24_REGADDR_RX_ADDR_P1, "RF24_REGADDR_RX_ADDR_P1",	5},
+	{ RF24_REGADDR_RX_ADDR_P2, "RF24_REGADDR_RX_ADDR_P2",	1},
+	{ RF24_REGADDR_RX_ADDR_P3, "RF24_REGADDR_RX_ADDR_P3",	1},
+	{ RF24_REGADDR_RX_ADDR_P4, "RF24_REGADDR_RX_ADDR_P4",	1},
+	{ RF24_REGADDR_RX_ADDR_P5, "RF24_REGADDR_RX_ADDR_P5",	1},
+	{ RF24_REGADDR_TX_ADDR, "RF24_REGADDR_TX_ADDR",			5},
+	{ RF24_REGADDR_RX_PW_P0, "RF24_REGADDR_RX_PW_P0",		1},
+	{ RF24_REGADDR_RX_PW_P1, "RF24_REGADDR_RX_PW_P1",		1},
+	{ RF24_REGADDR_RX_PW_P2, "RF24_REGADDR_RX_PW_P2",		1},
+	{ RF24_REGADDR_RX_PW_P3, "RF24_REGADDR_RX_PW_P3",		1},
+	{ RF24_REGADDR_RX_PW_P4, "RF24_REGADDR_RX_PW_P4",		1},
+	{ RF24_REGADDR_RX_PW_P5, "RF24_REGADDR_RX_PW_P5",		1},
+	{ RF24_REGADDR_FIFO_STATUS, "RF24_REGADDR_FIFO_STATUS", 1},
+	{ RF24_REGADDR_DYNPD, "RF24_REGADDR_DYNPD",				1},
+	{ RF24_REGADDR_FEATURE, "RF24_REGADDR_FEATURE",			1}
+};
+
+
+static void print_register(uint8_t reg_addr, uint8_t * reg_data)
+{
+	reg_param_t * selected_param = NULL;
+	for (size_t i = 0; i < sizeof(reg_params)/sizeof(reg_params[0]); i++)
+	{
+		if (reg_addr == reg_params[i].addr)
+		{
+			selected_param  = &reg_params[i];
+			break;
+		}
+	}
+
+	if (NULL == selected_param)
+	{
+		printf("invalid reg addr: %d\n", reg_addr);
+		return;
+	}
+
+	const char * reg_name = selected_param->name;
+	const size_t reg_size = selected_param->size;
+
+	printf("reg %s (0x%02X) = ", reg_name, (int)reg_addr);
+	if (1 == reg_size)
+	{
+		printf("0x%02X", reg_data[0]);
+		char bits_buffer[10] = {0};
+		print_bits(reg_data[0], bits_buffer);
+		printf(" (0b%s)", bits_buffer);
+	}
+	else
+	{
+		printf("0x");
+		for (size_t j = 0; j < reg_size; j++)
+		{
+			printf("%02X", reg_data[j]);
+		}
+	}
+	printf("\n");
+}
+
+static void dump_registers(void)
+{
+	const size_t regs_count = sizeof(reg_params)/sizeof(reg_params[0]);
+	for (size_t i = 0 ; i < regs_count; i++)
+	{
+		uint8_t reg_addr = reg_params[i].addr;
+		uint8_t reg_size = reg_params[i].size;
+
+		uint8_t reg_data[5] = { 0 };
+		rf24_read_register(reg_addr, reg_data, reg_size);
+
+		print_register(reg_addr, reg_data);
+	}
+}
+
