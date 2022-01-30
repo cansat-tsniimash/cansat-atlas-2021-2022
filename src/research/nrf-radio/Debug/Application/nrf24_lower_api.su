@@ -1,6 +1,0 @@
-nrf24_lower_api.c:26:6:rf24_read_register	24	static
-nrf24_lower_api.c:49:6:rf24_write_register	24	static
-nrf24_lower_api.c:74:6:rf24_write_tx_payload	32	static
-nrf24_lower_api.c:98:6:rf24_flush_tx	16	static
-nrf24_lower_api.c:107:6:rf24_get_status	32	static
-nrf24_lower_api.c:118:6:rf24_ce_activate	16	static
