@@ -85,8 +85,11 @@
 
 #define RF24_NOP 0xFF
 #define RF24_FLUSH_TX	0b11100001
+#define RF24_FLUSH_RX	0b11100010
 #define RF24_W_TX_PAYLOAD 0b10100000
 #define RF24_W_TX_PAYLOAD_NO_ACK 0b10100000
+#define RF24_R_RX_PAYLOAD 0b01100001
+#define RF24_R_RX_PL_WID 0b01100000
 
 // Чтение данных из регистров RF24
 /* Аргументы:

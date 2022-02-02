@@ -20,12 +20,6 @@ extern SPI_HandleTypeDef hspi2;
 #define CS_PORT GPIOA
 #define CS_PIN GPIO_PIN_0
 
-
-// Чтение данных из регистров RF24
-/* Аргументы:
-   reg_addr - адрес читаемого регистра
-   reg_data - указатель на буфер в который кладутся прочитанные данные
-   data_size - размер буфера для прочитанных данных */
 void rf24_read_register(uint8_t reg_addr, uint8_t * reg_data, size_t data_size)
 {
 	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
@@ -44,11 +38,6 @@ void rf24_read_register(uint8_t reg_addr, uint8_t * reg_data, size_t data_size)
 	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
 }
 
-// Запись данных в регистры RF24
-/* Аргументы:
-   reg_addr - адрес записываемого регистра
-   reg_data - указатель на буфер с записываемыми данными
-   data_size - размер буфера с записываемыми данными */
 void rf24_write_register(uint8_t reg_addr, const uint8_t * reg_data, size_t data_size)
 {
 	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
@@ -83,13 +72,24 @@ void rf24_write_register(uint8_t reg_addr, const uint8_t * reg_data, size_t data
 	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
 }
 
-// Запись пакета для отправки
-/* Аргументы:
-   payload_buffer - указатель на буфер с отправляемым пакетом
-   payload_size - размер отправляемого пакета в буфере payload_buffer
-   use_ack - нужно ли использовать ACK для этого пакета?
+void rf24_read_rx_payload(uint8_t * payload_buffer, size_t payload_buffer_size)
+{
+	uint8_t command = RF24_R_RX_PAYLOAD;
+	uint8_t payload_size = 0;
+	rf24_get_rx_payload_size(&payload_size);
+	if (payload_size > 0 || payload_size < 32)
+	{
+		if (payload_size > payload_buffer_size)
+		{
+			payload_size = payload_buffer_size;
+		}
+		HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+		HAL_SPI_Transmit(&hspi2, &command, 1, HAL_MAX_DELAY);
+		HAL_SPI_Receive(&hspi2, payload_buffer, payload_size, HAL_MAX_DELAY);
+		HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+	}
+}
 
-   Эта функция реализует две команды: W_TX_PAYLOAD_NOACK и W_TX_PAYLOAD */
 void rf24_write_tx_payload(const uint8_t * payload_buffer, size_t payload_size, bool use_ack)
 {
 	uint8_t command;
@@ -112,6 +112,13 @@ void rf24_write_tx_payload(const uint8_t * payload_buffer, size_t payload_size, 
 	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
 }
 
+void rf24_flush_rx(void)
+{
+	uint8_t command = RF24_FLUSH_RX;
+	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+	HAL_SPI_Transmit(&hspi2, &command, 1, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+}
 
 void rf24_flush_tx(void)
 {
@@ -121,6 +128,19 @@ void rf24_flush_tx(void)
 	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
 }
 
+void rf24_get_rx_payload_size(uint8_t * payload_size)
+{
+	uint8_t command = RF24_R_RX_PL_WID;
+	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+	HAL_SPI_Transmit(&hspi2, &command, 1, HAL_MAX_DELAY);
+	HAL_SPI_Receive(&hspi2, payload_size, 1, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+    if (*payload_size > 32)
+    {
+    	rf24_flush_rx();
+    	payload_size = 0;
+    }
+}
 
 void rf24_get_status(uint8_t * status)
 {
