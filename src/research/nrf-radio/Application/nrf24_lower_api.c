@@ -145,9 +145,11 @@ void rf24_get_rx_payload_size(uint8_t * payload_size)
 void rf24_get_status(uint8_t * status)
 {
 	uint8_t command = RF24_NOP;
+	HAL_Delay(100);
 	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
 	HAL_SPI_TransmitReceive(&hspi2, &command, status, 1, HAL_MAX_DELAY);
 	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+	HAL_Delay(100);
 }
 
 
