@@ -6,6 +6,9 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
 #include <stm32f4xx_hal.h>
 #include "nrf24_lower_api.h"
 
@@ -52,9 +55,25 @@ void rf24_write_register(uint8_t reg_addr, const uint8_t * reg_data, size_t data
 	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
 
 	// Добавляем в 5 битов адреса еще 3 бита для чтения из этого регистра
-	//reg_addr = (reg_addr & ~((1 << 6) | (1 << 7))) | (1 << 5);
-	reg_addr &= (1 << 7) | (1 << 6);
-	reg_addr |= (1 << 5);
+	//printf("addr pre 0x%02X\n", (int)reg_addr);
+	reg_addr = (reg_addr & ~((1 << 6) | (1 << 7))) | (1 << 5);
+	//reg_addr &= ~((1 << 7) | (1 << 6));
+	//reg_addr |= (1 << 5);
+	//printf("addr after 0x%02X\n", (int)reg_addr);
+
+	//printf("write_reg_tx: ");
+
+	char bits_buffer[10] = {0};
+	print_bits(reg_addr, bits_buffer);
+	//printf("addr 0x%02X (0b%s); ", (int)reg_addr, bits_buffer);
+
+	for (size_t i = 0; i < data_size; i++)
+	{
+		memset(bits_buffer, 0x00, sizeof(bits_buffer));
+		print_bits(reg_data[i], bits_buffer);
+		//printf("0x%02X (0b%s) ", (int)reg_data[i], bits_buffer);
+	}
+	//printf("\n");
 
 	// Передаем адресс регистра, который читаем, на шину spi и получаем в ответ значение STATUS регистра
 	HAL_SPI_Transmit(&hspi2, &reg_addr, 1, HAL_MAX_DELAY);
@@ -77,17 +96,16 @@ void rf24_write_tx_payload(const uint8_t * payload_buffer, size_t payload_size, 
 	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
 	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
 
-    if (use_ack)
-    {
-    	command = RF24_W_TX_PAYLOAD;
-    }
-    else
-    {
-    	command = RF24_W_TX_PAYLOAD_NO_ACK;
-    }
-    /*передаем команду */
+	if (use_ack)
+	{
+		command = RF24_W_TX_PAYLOAD;
+	}
+	else
+	{
+		command = RF24_W_TX_PAYLOAD_NO_ACK;
+	}
+	/*передаем команду */
 	HAL_SPI_Transmit(&hspi2, &command, 1, HAL_MAX_DELAY);
-
 	HAL_SPI_Transmit(&hspi2, (uint8_t*)payload_buffer, payload_size, HAL_MAX_DELAY);
 
 	// Поднимаем chip select для того, что бы закончить общение с конкретным устройством.

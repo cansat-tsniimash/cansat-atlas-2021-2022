@@ -68,7 +68,5 @@ typedef struct rf_params_t
 	bool enable_lna;
 } rf_params_t;
 
-void
-
 
 #endif /* APP_MAIN_H_ */
