@@ -221,6 +221,17 @@ static void dump_registers(void);
 void print_bits(uint8_t value, char * buffer);
 static void print_register(uint8_t reg_addr, uint8_t * reg_data);
 
+// Only for debug
+void read_regs()
+{
+	uint8_t status;
+	uint8_t obs_tx;
+	rf24_get_status(&status);
+	rf24_read_register(RF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
+	print_register(RF24_REGADDR_STATUS, &status);
+	print_register(RF24_REGADDR_OBSERVE_TX, &obs_tx);
+}
+
 int app_main()
 {
 	// Работаем по приложению A даташита. Что нужно сделать чтобы передавать
@@ -235,36 +246,36 @@ int app_main()
 
 	// в первую очередь настроим модуль
 	// переходим в power down
-//	uint8_t config_pd = 0x08;
-//	rf24_write_register(RF24_REGADDR_CONFIG, &config_pd, 1);
-//	print_register(RF24_REGADDR_CONFIG, &config_pd);
+	uint8_t config_pd = 0x08;
+	rf24_write_register(RF24_REGADDR_CONFIG, &config_pd, 1);
+	print_register(RF24_REGADDR_CONFIG, &config_pd);
 
-	// Включаем все FEATURES
-	//uint8_t features = 0;
-	//features = (1 << 2) | (1 << 1) | (1 << 0);
-	//rf24_write_register(RF24_REGADDR_FEATURE, &features, 1);
-	//print_register(RF24_REGADDR_FEATURE, &features);
+	//Включаем все FEATURES
+	uint8_t features = 0;
+	features = (1 << 2) | (1 << 1) | (1 << 0);
+	rf24_write_register(RF24_REGADDR_FEATURE, &features, 1);
+	print_register(RF24_REGADDR_FEATURE, &features);
 
 	// Теперь нужно установить адрес пайпа на который мы будем передавать
-	//uint64_t tx_addr = 0x00cadebaba;
-	//rf24_write_register(RF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr), 5); // 5 байт на адрес без доп настроек
-	//print_register(RF24_REGADDR_TX_ADDR, &tx_addr);
+	uint64_t tx_addr = 0x00cadebaba;
+	rf24_write_register(RF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr), 5); // 5 байт на адрес без доп настроек
+	print_register(RF24_REGADDR_TX_ADDR, &tx_addr);
 
 	// Выставляем мощность и частоту
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	uint8_t rf_setup = 0;
-	// Скорость на 250 кбит
-	//rf_setup |= RF24_RFSETUP_RF_DR_LOW;
-	//rf_setup &= ~RF24_RFSETUP_RF_DR_HIGH;
+	//Скорость на 250 кбит
+	rf_setup |= RF24_RFSETUP_RF_DR_HIGH;
+	rf_setup &= ~RF24_RFSETUP_RF_DR_LOW;
 	// МАКСИМАЛЬНАЯ МОЩНОСТЬ
-	//rf_setup &= ~(RF24_RFSETUP_RF_PWR_MASK << RF24_RFSETUP_RF_PWR_OFFSET);
-	//rf_setup |= (0x03 & RF24_RFSETUP_RF_PWR_MASK) << RF24_RFSETUP_RF_PWR_OFFSET;
-	//rf24_write_register(RF24_REGADDR_RF_SETUP, &rf_setup, 1);
-	//print_register(RF24_REGADDR_RF_SETUP, (uint8_t*)&rf_setup);
+	rf_setup &= ~(RF24_RFSETUP_RF_PWR_MASK << RF24_RFSETUP_RF_PWR_OFFSET);
+	rf_setup |= (0x03 & RF24_RFSETUP_RF_PWR_MASK) << RF24_RFSETUP_RF_PWR_OFFSET;
+	rf24_write_register(RF24_REGADDR_RF_SETUP, &rf_setup, 1);
+	print_register(RF24_REGADDR_RF_SETUP, (uint8_t*)&rf_setup);
 
 	// частота считается как 2400 МГц + канал
 	// встанем на 2437 - 6ой канал Wi-Fi
-	uint8_t rf_channel = 119;
+	uint8_t rf_channel = 118;
     rf24_write_register(RF24_REGADDR_RF_CH, &rf_channel, 1);
 	print_register(RF24_REGADDR_RF_CH, &rf_channel);
 
@@ -278,11 +289,11 @@ int app_main()
 	uint8_t cfg_reg = 0;
 	cfg_reg &= ~RF24_CONFIG_PRIM_RX; // Будем передатчиком
 	cfg_reg |= RF24_CONFIG_PWR_UP; // Не будем спать
-	//cfg_reg |= RF24_CONFIG_EN_CRC; // Будем использовать контрольную сумму
-	//cfg_reg &= ~RF24_CONFIG_CRCO;  // 1 байт на контрольную сумму
+	cfg_reg |= RF24_CONFIG_EN_CRC; // Будем использовать контрольную сумму
+	cfg_reg &= ~RF24_CONFIG_CRCO;  // 1 байт на контрольную сумму
 	// Прерывания не используем и даже трогать на будем
-	//rf24_write_register(RF24_REGADDR_CONFIG, &cfg_reg, 1);
-	//print_register(RF24_REGADDR_CONFIG, &cfg_reg);
+	rf24_write_register(RF24_REGADDR_CONFIG, &cfg_reg, 1);
+	print_register(RF24_REGADDR_CONFIG, &cfg_reg);
 
 
 	printf("configured\n");
@@ -294,8 +305,6 @@ int app_main()
 	int packet_number = 0;
 	//rf24_ce_activate(true);
 	// TODO: вычитать статус и посмотреть что там происходит
-	uint8_t status;
-	uint8_t obs_tx;
 	while(1)
 	{
 		uint8_t payload[32] = {0};
@@ -303,60 +312,47 @@ int app_main()
 		// Запишем пайлоад строкой
 		//snprintf(payload, sizeof(payload), "packet no %d", packet_number);
 
-		rf24_get_status(&status);
-		rf24_read_register(RF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
-		printf("status_before_flush_clear\n");
-		print_register(RF24_REGADDR_STATUS, &status);
-		print_register(RF24_REGADDR_OBSERVE_TX, &obs_tx);
+
 
 		// загоняем на радио
 		// Мы не включали динамических размеров пейлоада, поэтому гоним целиком 32 байта
 		// с нулями
 		rf24_flush_tx();
-		rf24_write_tx_payload(payload, sizeof(payload), true);
+		rf24_write_tx_payload(payload, sizeof(payload), false);
 
-		rf24_get_status(&status);
-		rf24_read_register(RF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
 		printf("status_after_w_tx_clear\n");
-		print_register(RF24_REGADDR_STATUS, &status);
-		print_register(RF24_REGADDR_OBSERVE_TX, &obs_tx);
+		read_regs();
 
 		// дергаем CE на 10мкс чтобы начать передачу.
 		// МЫ не умеем по микросекундам, поэтому дернем на миллисекунду
 		HAL_Delay(10);
-		rf24_ce_activate(true);
-		HAL_Delay(1);
 		rf24_ce_activate(false);
+		HAL_Delay(1);
+		rf24_ce_activate(true);
 
-		rf24_get_status(&status);
-		rf24_read_register(RF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
 		printf("status_after_ce_activate_clear\n");
-		print_register(RF24_REGADDR_STATUS, &status);
-		print_register(RF24_REGADDR_OBSERVE_TX, &obs_tx);
+		read_regs();
+
 
 		// Подождем сколько-то пока пакет отправляется
 		// Пускай будет 100 мс
 		HAL_Delay(100);
 
-		rf24_get_status(&status);
-		rf24_read_register(RF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
 		printf("status_before_clear\n");
-		print_register(RF24_REGADDR_STATUS, &status);
-		print_register(RF24_REGADDR_OBSERVE_TX, &obs_tx);
+		read_regs();
 
 		uint8_t irq_clear = (1 << 6) | (1 << 5) | (1 << 4);
 		rf24_write_register(RF24_REGADDR_STATUS, &irq_clear, 1);
 
-		rf24_get_status(&status);
-		rf24_read_register(RF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
 		printf("status_after_clear\n");
-		print_register(RF24_REGADDR_STATUS, &status);
-		print_register(RF24_REGADDR_OBSERVE_TX, &obs_tx);
+		read_regs();
 
 		// Увеличиваем номер пакета
 		packet_number++;
 
-		HAL_Delay(500);
+		//dump_registers();
+
+		//HAL_Delay(100);
 	}
 }
 

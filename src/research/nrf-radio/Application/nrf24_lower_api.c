@@ -20,10 +20,25 @@ extern SPI_HandleTypeDef hspi2;
 #define CS_PORT GPIOA
 #define CS_PIN GPIO_PIN_0
 
+void _rf24_CS(bool mode)
+{
+	if (mode)
+	{
+		// Опускаем chip select для того, что бы начать общение с конкретным устройством.
+		HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+		HAL_Delay(11);
+	}
+	else
+	{
+		// Поднимаем chip select для того, что бы закончить общение с конкретным устройством.
+		HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+		HAL_Delay(100);
+	}
+}
+
 void rf24_read_register(uint8_t reg_addr, uint8_t * reg_data, size_t data_size)
 {
-	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+	_rf24_CS(true);
 
 	// Добавляем в 5 битов адреса еще 3 бита для чтения из этого регистра
 	reg_addr = reg_addr & ~((1 << 5) | (1 << 6) | (1 << 7));
@@ -34,14 +49,12 @@ void rf24_read_register(uint8_t reg_addr, uint8_t * reg_data, size_t data_size)
 	// Читаем данные
 	HAL_SPI_Receive(&hspi2, reg_data, data_size, HAL_MAX_DELAY);
 
-	// Поднимаем chip select для того, что бы закончить общение с конкретным устройством.
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+	_rf24_CS(false);
 }
 
 void rf24_write_register(uint8_t reg_addr, const uint8_t * reg_data, size_t data_size)
 {
-	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+	_rf24_CS(true);
 
 	// Добавляем в 5 битов адреса еще 3 бита для чтения из этого регистра
 	//printf("addr pre 0x%02X\n", (int)reg_addr);
@@ -52,24 +65,23 @@ void rf24_write_register(uint8_t reg_addr, const uint8_t * reg_data, size_t data
 
 	//printf("write_reg_tx: ");
 
-	char bits_buffer[10] = {0};
-	print_bits(reg_addr, bits_buffer);
+	//char bits_buffer[10] = {0};
+	//print_bits(reg_addr, bits_buffer);
 	//printf("addr 0x%02X (0b%s); ", (int)reg_addr, bits_buffer);
 
-	for (size_t i = 0; i < data_size; i++)
-	{
-		memset(bits_buffer, 0x00, sizeof(bits_buffer));
-		print_bits(reg_data[i], bits_buffer);
+	//for (size_t i = 0; i < data_size; i++)
+	//{
+		//memset(bits_buffer, 0x00, sizeof(bits_buffer));
+		//print_bits(reg_data[i], bits_buffer);
 		//printf("0x%02X (0b%s) ", (int)reg_data[i], bits_buffer);
-	}
+	//}
 	//printf("\n");
 
 	// Передаем адресс регистра, который читаем, на шину spi и получаем в ответ значение STATUS регистра
 	HAL_SPI_Transmit(&hspi2, &reg_addr, 1, HAL_MAX_DELAY);
 	HAL_SPI_Transmit(&hspi2, (uint8_t*)reg_data, data_size, HAL_MAX_DELAY);
 
-	// Поднимаем chip select для того, что бы закончить общение с конкретным устройством.
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+	_rf24_CS(false);
 }
 
 void rf24_read_rx_payload(uint8_t * payload_buffer, size_t payload_buffer_size)
@@ -83,18 +95,17 @@ void rf24_read_rx_payload(uint8_t * payload_buffer, size_t payload_buffer_size)
 		{
 			payload_size = payload_buffer_size;
 		}
-		HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+		_rf24_CS(true);
 		HAL_SPI_Transmit(&hspi2, &command, 1, HAL_MAX_DELAY);
 		HAL_SPI_Receive(&hspi2, payload_buffer, payload_size, HAL_MAX_DELAY);
-		HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+		_rf24_CS(false);
 	}
 }
 
 void rf24_write_tx_payload(const uint8_t * payload_buffer, size_t payload_size, bool use_ack)
 {
 	uint8_t command;
-	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+	_rf24_CS(true);
 
 	if (use_ack)
 	{
@@ -108,33 +119,32 @@ void rf24_write_tx_payload(const uint8_t * payload_buffer, size_t payload_size, 
 	HAL_SPI_Transmit(&hspi2, &command, 1, HAL_MAX_DELAY);
 	HAL_SPI_Transmit(&hspi2, (uint8_t*)payload_buffer, payload_size, HAL_MAX_DELAY);
 
-	// Поднимаем chip select для того, что бы закончить общение с конкретным устройством.
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+	_rf24_CS(false);
 }
 
 void rf24_flush_rx(void)
 {
 	uint8_t command = RF24_FLUSH_RX;
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+	_rf24_CS(true);
 	HAL_SPI_Transmit(&hspi2, &command, 1, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+	_rf24_CS(false);
 }
 
 void rf24_flush_tx(void)
 {
 	uint8_t command = RF24_FLUSH_TX;
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+	_rf24_CS(true);
 	HAL_SPI_Transmit(&hspi2, &command, 1, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+	_rf24_CS(false);
 }
 
 void rf24_get_rx_payload_size(uint8_t * payload_size)
 {
 	uint8_t command = RF24_R_RX_PL_WID;
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+	_rf24_CS(true);
 	HAL_SPI_Transmit(&hspi2, &command, 1, HAL_MAX_DELAY);
 	HAL_SPI_Receive(&hspi2, payload_size, 1, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
+	_rf24_CS(false);
     if (*payload_size > 32)
     {
     	rf24_flush_rx();
@@ -145,11 +155,9 @@ void rf24_get_rx_payload_size(uint8_t * payload_size)
 void rf24_get_status(uint8_t * status)
 {
 	uint8_t command = RF24_NOP;
-	HAL_Delay(100);
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_RESET);
+	_rf24_CS(true);
 	HAL_SPI_TransmitReceive(&hspi2, &command, status, 1, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(CS_PORT, CS_PIN,  GPIO_PIN_SET);
-	HAL_Delay(100);
+	_rf24_CS(false);
 }
 
 
