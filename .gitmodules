@@ -1,0 +1,3 @@
+[submodule "lib-tsniimash"]
+	path = lib-tsniimash
+	url = ../lib-tsniimash.git
