@@ -8,6 +8,9 @@
 #ifndef NRF24_LOWER_API_H_
 #define NRF24_LOWER_API_H_
 
+#include <stm32f4xx_hal.h>
+#ifdef HAL_SPI_MODULE_ENABLED
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -157,4 +160,5 @@ void rf24_get_status(uint8_t * status);
 /* onoff: значение true - CE прижат к полу; false - CE поднят к 1 */
 void rf24_ce_activate(bool onoff);
 
+#endif /* HAL_SPI_MODULE_ENABLED */
 #endif /* NRF24_LOWER_API_H_ */

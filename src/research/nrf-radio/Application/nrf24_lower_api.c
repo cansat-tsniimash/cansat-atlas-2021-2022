@@ -4,12 +4,14 @@
  *  Created on: 29 янв. 2022 г.
  *      Author: 1
  */
+
+#include <stm32f4xx_hal.h>
+#ifdef HAL_SPI_MODULE_ENABLED
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <stm32f4xx_hal.h>
 #include "nrf24_lower_api.h"
 
 extern SPI_HandleTypeDef hspi2;
@@ -174,3 +176,4 @@ void rf24_ce_activate(bool onoff)
 		HAL_GPIO_WritePin(CE_PORT, CE_PIN,  GPIO_PIN_SET);
 	}
 }
+#endif /* HAL_SPI_MODULE_ENABLED */
