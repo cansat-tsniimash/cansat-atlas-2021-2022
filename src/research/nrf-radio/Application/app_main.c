@@ -3,7 +3,7 @@
 #include <inttypes.h>
 
 #include <stm32f4xx_hal.h>
-#include "nrf24_lower_api.h"
+#include "nRF24L01_PL/nrf24_lower_api.h"
 
 extern SPI_HandleTypeDef hspi2;
 /*
