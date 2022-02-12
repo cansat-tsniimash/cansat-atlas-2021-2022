@@ -257,16 +257,16 @@ int app_main()
 	print_register(RF24_REGADDR_FEATURE, &features);
 
 	// Теперь нужно установить адрес пайпа на который мы будем передавать
-	uint64_t tx_addr = 0x00cadebaba;
+	uint64_t tx_addr = 0xacacacacac;
 	rf24_write_register(RF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr), 5); // 5 байт на адрес без доп настроек
-	print_register(RF24_REGADDR_TX_ADDR, &tx_addr);
+	print_register(RF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr));
 
 	// Выставляем мощность и частоту
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	uint8_t rf_setup = 0;
 	//Скорость на 250 кбит
-	rf_setup |= RF24_RFSETUP_RF_DR_HIGH;
-	rf_setup &= ~RF24_RFSETUP_RF_DR_LOW;
+	rf_setup &= ~RF24_RFSETUP_RF_DR_HIGH;
+	rf_setup |= RF24_RFSETUP_RF_DR_LOW;
 	// МАКСИМАЛЬНАЯ МОЩНОСТЬ
 	rf_setup &= ~(RF24_RFSETUP_RF_PWR_MASK << RF24_RFSETUP_RF_PWR_OFFSET);
 	rf_setup |= (0x03 & RF24_RFSETUP_RF_PWR_MASK) << RF24_RFSETUP_RF_PWR_OFFSET;
@@ -278,6 +278,9 @@ int app_main()
 	uint8_t rf_channel = 118;
     rf24_write_register(RF24_REGADDR_RF_CH, &rf_channel, 1);
 	print_register(RF24_REGADDR_RF_CH, &rf_channel);
+
+	rf_setup = 0x3f;
+	rf24_write_register(RF24_REGADDR_DYNPD, &rf_setup, 1);
 
 	// по-умолчанию включено аж 2 пайпа на приём и для них включены авто ACK
 	// Сейчас у нас не будет приёмника, поэтому модуль будет отправлять пакет
@@ -307,7 +310,7 @@ int app_main()
 	// TODO: вычитать статус и посмотреть что там происходит
 	while(1)
 	{
-		uint8_t payload[32] = {0};
+		uint8_t payload[32] = {'H', 'e', 'l', 'l', 'o', ',', ' ', 'T', 'i', 'm', 'o', 'f', 'e', 'i', '!'};
 
 		// Запишем пайлоад строкой
 		//snprintf(payload, sizeof(payload), "packet no %d", packet_number);
