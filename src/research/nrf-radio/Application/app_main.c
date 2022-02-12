@@ -226,10 +226,10 @@ void read_regs()
 {
 	uint8_t status;
 	uint8_t obs_tx;
-	rf24_get_status(&status);
-	rf24_read_register(RF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
-	print_register(RF24_REGADDR_STATUS, &status);
-	print_register(RF24_REGADDR_OBSERVE_TX, &obs_tx);
+	nrf24_get_status(&status);
+	nrf24_read_register(NRF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
+	print_register(NRF24_REGADDR_STATUS, &status);
+	print_register(NRF24_REGADDR_OBSERVE_TX, &obs_tx);
 }
 
 int app_main()
@@ -247,40 +247,40 @@ int app_main()
 	// в первую очередь настроим модуль
 	// переходим в power down
 	uint8_t config_pd = 0x08;
-	rf24_write_register(RF24_REGADDR_CONFIG, &config_pd, 1);
-	print_register(RF24_REGADDR_CONFIG, &config_pd);
+	nrf24_write_register(NRF24_REGADDR_CONFIG, &config_pd, 1);
+	print_register(NRF24_REGADDR_CONFIG, &config_pd);
 
 	//Включаем все FEATURES
 	uint8_t features = 0;
 	features = (1 << 2) | (1 << 1) | (1 << 0);
-	rf24_write_register(RF24_REGADDR_FEATURE, &features, 1);
-	print_register(RF24_REGADDR_FEATURE, &features);
+	nrf24_write_register(NRF24_REGADDR_FEATURE, &features, 1);
+	print_register(NRF24_REGADDR_FEATURE, &features);
 
 	// Теперь нужно установить адрес пайпа на который мы будем передавать
 	uint64_t tx_addr = 0xacacacacac;
-	rf24_write_register(RF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr), 5); // 5 байт на адрес без доп настроек
-	print_register(RF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr));
+	nrf24_write_register(NRF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr), 5); // 5 байт на адрес без доп настроек
+	print_register(NRF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr));
 
 	// Выставляем мощность и частоту
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	uint8_t rf_setup = 0;
 	//Скорость на 250 кбит
-	rf_setup &= ~RF24_RFSETUP_RF_DR_HIGH;
-	rf_setup |= RF24_RFSETUP_RF_DR_LOW;
+	rf_setup &= ~NRF24_RFSETUP_RF_DR_HIGH;
+	rf_setup |= NRF24_RFSETUP_RF_DR_LOW;
 	// МАКСИМАЛЬНАЯ МОЩНОСТЬ
-	rf_setup &= ~(RF24_RFSETUP_RF_PWR_MASK << RF24_RFSETUP_RF_PWR_OFFSET);
-	rf_setup |= (0x03 & RF24_RFSETUP_RF_PWR_MASK) << RF24_RFSETUP_RF_PWR_OFFSET;
-	rf24_write_register(RF24_REGADDR_RF_SETUP, &rf_setup, 1);
-	print_register(RF24_REGADDR_RF_SETUP, (uint8_t*)&rf_setup);
+	rf_setup &= ~(NRF24_RFSETUP_RF_PWR_MASK << NRF24_RFSETUP_RF_PWR_OFFSET);
+	rf_setup |= (0x03 & NRF24_RFSETUP_RF_PWR_MASK) << NRF24_RFSETUP_RF_PWR_OFFSET;
+	nrf24_write_register(NRF24_REGADDR_RF_SETUP, &rf_setup, 1);
+	print_register(NRF24_REGADDR_RF_SETUP, (uint8_t*)&rf_setup);
 
 	// частота считается как 2400 МГц + канал
 	// встанем на 2437 - 6ой канал Wi-Fi
 	uint8_t rf_channel = 118;
-    rf24_write_register(RF24_REGADDR_RF_CH, &rf_channel, 1);
-	print_register(RF24_REGADDR_RF_CH, &rf_channel);
+    nrf24_write_register(NRF24_REGADDR_RF_CH, &rf_channel, 1);
+	print_register(NRF24_REGADDR_RF_CH, &rf_channel);
 
 	rf_setup = 0x3f;
-	rf24_write_register(RF24_REGADDR_DYNPD, &rf_setup, 1);
+	nrf24_write_register(NRF24_REGADDR_DYNPD, &rf_setup, 1);
 
 	// по-умолчанию включено аж 2 пайпа на приём и для них включены авто ACK
 	// Сейчас у нас не будет приёмника, поэтому модуль будет отправлять пакет
@@ -290,13 +290,13 @@ int app_main()
 	// Начнем с конфигурационного регистра
 	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 	uint8_t cfg_reg = 0;
-	cfg_reg &= ~RF24_CONFIG_PRIM_RX; // Будем передатчиком
-	cfg_reg |= RF24_CONFIG_PWR_UP; // Не будем спать
-	cfg_reg |= RF24_CONFIG_EN_CRC; // Будем использовать контрольную сумму
-	cfg_reg &= ~RF24_CONFIG_CRCO;  // 1 байт на контрольную сумму
+	cfg_reg &= ~NRF24_CONFIG_PRIM_RX; // Будем передатчиком
+	cfg_reg |= NRF24_CONFIG_PWR_UP; // Не будем спать
+	cfg_reg |= NRF24_CONFIG_EN_CRC; // Будем использовать контрольную сумму
+	cfg_reg &= ~NRF24_CONFIG_CRCO;  // 1 байт на контрольную сумму
 	// Прерывания не используем и даже трогать на будем
-	rf24_write_register(RF24_REGADDR_CONFIG, &cfg_reg, 1);
-	print_register(RF24_REGADDR_CONFIG, &cfg_reg);
+	nrf24_write_register(NRF24_REGADDR_CONFIG, &cfg_reg, 1);
+	print_register(NRF24_REGADDR_CONFIG, &cfg_reg);
 
 
 	printf("configured\n");
@@ -306,7 +306,7 @@ int app_main()
 	//while(1) {}
 
 	int packet_number = 0;
-	//rf24_ce_activate(true);
+	//nrf24_ce_activate(true);
 	// TODO: вычитать статус и посмотреть что там происходит
 	while(1)
 	{
@@ -320,8 +320,8 @@ int app_main()
 		// загоняем на радио
 		// Мы не включали динамических размеров пейлоада, поэтому гоним целиком 32 байта
 		// с нулями
-		rf24_flush_tx();
-		rf24_write_tx_payload(payload, sizeof(payload), false);
+		nrf24_flush_tx();
+		nrf24_write_tx_payload(payload, sizeof(payload), false);
 
 		printf("status_after_w_tx_clear\n");
 		read_regs();
@@ -329,9 +329,9 @@ int app_main()
 		// дергаем CE на 10мкс чтобы начать передачу.
 		// МЫ не умеем по микросекундам, поэтому дернем на миллисекунду
 		HAL_Delay(10);
-		rf24_ce_activate(false);
+		nrf24_ce_activate(false);
 		HAL_Delay(1);
-		rf24_ce_activate(true);
+		nrf24_ce_activate(true);
 
 		printf("status_after_ce_activate_clear\n");
 		read_regs();
@@ -345,7 +345,7 @@ int app_main()
 		read_regs();
 
 		uint8_t irq_clear = (1 << 6) | (1 << 5) | (1 << 4);
-		rf24_write_register(RF24_REGADDR_STATUS, &irq_clear, 1);
+		nrf24_write_register(NRF24_REGADDR_STATUS, &irq_clear, 1);
 
 		printf("status_after_clear\n");
 		read_regs();
@@ -382,32 +382,32 @@ typedef struct reg_param_t
 
 
 static reg_param_t reg_params[] = {
-	{ RF24_REGADDR_CONFIG, "RF24_REGADDR_CONFIG",			1},
-	{ RF24_REGADDR_EN_AA, "RF24_REGADDR_EN_AA",				1},
-	{ RF24_REGADDR_EN_RXADDR, "RF24_REGADDR_EN_RXADDR",		1},
-	{ RF24_REGADDR_SETUP_AW, "RF24_REGADDR_SETUP_AW",		1},
-	{ RF24_REGADDR_SETUP_RETR, "RF24_REGADDR_SETUP_RETR",	1},
-	{ RF24_REGADDR_RF_CH, "RF24_REGADDR_RF_CH",				1},
-	{ RF24_REGADDR_RF_SETUP, "RF24_REGADDR_RF_SETUP",		1},
-	{ RF24_REGADDR_STATUS, "RF24_REGADDR_STATUS",			1},
-	{ RF24_REGADDR_OBSERVE_TX, "RF24_REGADDR_OBSERVE_TX",	1},
-	{ RF24_REGADDR_RPD, "RF24_REGADDR_RPD",					1},
-	{ RF24_REGADDR_RX_ADDR_P0, "RF24_REGADDR_RX_ADDR_P0",	5},
-	{ RF24_REGADDR_RX_ADDR_P1, "RF24_REGADDR_RX_ADDR_P1",	5},
-	{ RF24_REGADDR_RX_ADDR_P2, "RF24_REGADDR_RX_ADDR_P2",	1},
-	{ RF24_REGADDR_RX_ADDR_P3, "RF24_REGADDR_RX_ADDR_P3",	1},
-	{ RF24_REGADDR_RX_ADDR_P4, "RF24_REGADDR_RX_ADDR_P4",	1},
-	{ RF24_REGADDR_RX_ADDR_P5, "RF24_REGADDR_RX_ADDR_P5",	1},
-	{ RF24_REGADDR_TX_ADDR, "RF24_REGADDR_TX_ADDR",			5},
-	{ RF24_REGADDR_RX_PW_P0, "RF24_REGADDR_RX_PW_P0",		1},
-	{ RF24_REGADDR_RX_PW_P1, "RF24_REGADDR_RX_PW_P1",		1},
-	{ RF24_REGADDR_RX_PW_P2, "RF24_REGADDR_RX_PW_P2",		1},
-	{ RF24_REGADDR_RX_PW_P3, "RF24_REGADDR_RX_PW_P3",		1},
-	{ RF24_REGADDR_RX_PW_P4, "RF24_REGADDR_RX_PW_P4",		1},
-	{ RF24_REGADDR_RX_PW_P5, "RF24_REGADDR_RX_PW_P5",		1},
-	{ RF24_REGADDR_FIFO_STATUS, "RF24_REGADDR_FIFO_STATUS", 1},
-	{ RF24_REGADDR_DYNPD, "RF24_REGADDR_DYNPD",				1},
-	{ RF24_REGADDR_FEATURE, "RF24_REGADDR_FEATURE",			1}
+	{ NRF24_REGADDR_CONFIG, "NRF24_REGADDR_CONFIG",			1},
+	{ NRF24_REGADDR_EN_AA, "NRF24_REGADDR_EN_AA",				1},
+	{ NRF24_REGADDR_EN_RXADDR, "NRF24_REGADDR_EN_RXADDR",		1},
+	{ NRF24_REGADDR_SETUP_AW, "NRF24_REGADDR_SETUP_AW",		1},
+	{ NRF24_REGADDR_SETUP_RETR, "NRF24_REGADDR_SETUP_RETR",	1},
+	{ NRF24_REGADDR_RF_CH, "NRF24_REGADDR_RF_CH",				1},
+	{ NRF24_REGADDR_RF_SETUP, "NRF24_REGADDR_RF_SETUP",		1},
+	{ NRF24_REGADDR_STATUS, "NRF24_REGADDR_STATUS",			1},
+	{ NRF24_REGADDR_OBSERVE_TX, "NRF24_REGADDR_OBSERVE_TX",	1},
+	{ NRF24_REGADDR_RPD, "NRF24_REGADDR_RPD",					1},
+	{ NRF24_REGADDR_RX_ADDR_P0, "NRF24_REGADDR_RX_ADDR_P0",	5},
+	{ NRF24_REGADDR_RX_ADDR_P1, "NRF24_REGADDR_RX_ADDR_P1",	5},
+	{ NRF24_REGADDR_RX_ADDR_P2, "NRF24_REGADDR_RX_ADDR_P2",	1},
+	{ NRF24_REGADDR_RX_ADDR_P3, "NRF24_REGADDR_RX_ADDR_P3",	1},
+	{ NRF24_REGADDR_RX_ADDR_P4, "NRF24_REGADDR_RX_ADDR_P4",	1},
+	{ NRF24_REGADDR_RX_ADDR_P5, "NRF24_REGADDR_RX_ADDR_P5",	1},
+	{ NRF24_REGADDR_TX_ADDR, "NRF24_REGADDR_TX_ADDR",			5},
+	{ NRF24_REGADDR_RX_PW_P0, "NRF24_REGADDR_RX_PW_P0",		1},
+	{ NRF24_REGADDR_RX_PW_P1, "NRF24_REGADDR_RX_PW_P1",		1},
+	{ NRF24_REGADDR_RX_PW_P2, "NRF24_REGADDR_RX_PW_P2",		1},
+	{ NRF24_REGADDR_RX_PW_P3, "NRF24_REGADDR_RX_PW_P3",		1},
+	{ NRF24_REGADDR_RX_PW_P4, "NRF24_REGADDR_RX_PW_P4",		1},
+	{ NRF24_REGADDR_RX_PW_P5, "NRF24_REGADDR_RX_PW_P5",		1},
+	{ NRF24_REGADDR_FIFO_STATUS, "NRF24_REGADDR_FIFO_STATUS", 1},
+	{ NRF24_REGADDR_DYNPD, "NRF24_REGADDR_DYNPD",				1},
+	{ NRF24_REGADDR_FEATURE, "NRF24_REGADDR_FEATURE",			1}
 };
 
 
@@ -460,7 +460,7 @@ static void dump_registers(void)
 		uint8_t reg_size = reg_params[i].size;
 
 		uint8_t reg_data[5] = { 0 };
-		rf24_read_register(reg_addr, reg_data, reg_size);
+		nrf24_read_register(reg_addr, reg_data, reg_size);
 
 		print_register(reg_addr, reg_data);
 	}
