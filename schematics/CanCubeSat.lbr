@@ -3501,42 +3501,23 @@
 <smd name="P$3" x="0" y="0" dx="1.4" dy="1.4" layer="1" roundness="100"/>
 <hole x="0" y="0" drill="1"/>
 </package>
-<package name="BME280C">
-<wire x1="-1.25" y1="1.25" x2="-1.25" y2="-1.25" width="0.127" layer="21"/>
-<wire x1="-1.25" y1="-1.25" x2="1.25" y2="-1.25" width="0.127" layer="21"/>
-<wire x1="1.25" y1="-1.25" x2="1.25" y2="1.25" width="0.127" layer="21"/>
-<wire x1="1.25" y1="1.25" x2="-1.25" y2="1.25" width="0.127" layer="21"/>
-<smd name="1" x="1.025" y="0.975" dx="0.5" dy="0.35" layer="1"/>
-<smd name="2" x="1.025" y="0.325" dx="0.5" dy="0.35" layer="1"/>
-<smd name="3" x="1.025" y="-0.325" dx="0.5" dy="0.35" layer="1"/>
-<smd name="4" x="1.025" y="-0.975" dx="0.5" dy="0.35" layer="1"/>
-<smd name="5" x="-1.025" y="-0.975" dx="0.5" dy="0.35" layer="1"/>
-<smd name="6" x="-1.025" y="-0.325" dx="0.5" dy="0.35" layer="1"/>
-<smd name="8" x="-1.025" y="0.975" dx="0.5" dy="0.35" layer="1"/>
-<smd name="7" x="-1.025" y="0.325" dx="0.5" dy="0.35" layer="1"/>
-<text x="-1.2" y="1.5" size="0.5" layer="25" font="vector">&gt;NAME</text>
-</package>
-<package name="GOOUUUATGM336H">
-<wire x1="-5.05" y1="4.85" x2="-5.05" y2="-4.85" width="0.127" layer="21"/>
-<wire x1="-5.05" y1="-4.85" x2="5.05" y2="-4.85" width="0.127" layer="21"/>
-<wire x1="5.05" y1="-4.85" x2="5.05" y2="4.85" width="0.127" layer="21"/>
-<wire x1="5.05" y1="4.85" x2="-5.05" y2="4.85" width="0.127" layer="21"/>
-<pad name="1" x="4" y="4" drill="0.6" shape="square"/>
-<pad name="2" x="4" y="2" drill="0.6"/>
-<pad name="3" x="4" y="0" drill="0.6"/>
-<pad name="4" x="4" y="-2" drill="0.6"/>
-<pad name="5" x="4" y="-4" drill="0.6"/>
-<wire x1="-4" y1="4" x2="-4" y2="-4" width="0.127" layer="21"/>
-<wire x1="-4" y1="-4" x2="2" y2="-4" width="0.127" layer="21"/>
-<wire x1="2" y1="-4" x2="2" y2="4" width="0.127" layer="21"/>
-<wire x1="2" y1="4" x2="-4" y2="4" width="0.127" layer="21"/>
-<text x="-3" y="5" size="1.27" layer="25" font="vector">&gt;NAME</text>
-</package>
 <package name="BUZZER">
 <circle x="0" y="0" radius="6" width="0.1" layer="21"/>
-<pad name="+" x="0" y="3.7" drill="0.9" shape="octagon"/>
-<pad name="-" x="0" y="-3.7" drill="0.9" shape="octagon"/>
-<text x="-3" y="7" size="1.27" layer="25" font="vector">&gt;NAME</text>
+<pad name="-" x="0" y="4" drill="0.9" shape="octagon"/>
+<pad name="+" x="0" y="-4" drill="0.9" shape="octagon"/>
+<text x="-3.175" y="6.858" size="1.27" layer="25" font="vector">&gt;NAME</text>
+</package>
+<package name="5PINSOT23">
+<wire x1="-1.525" y1="0.875" x2="-1.525" y2="-0.875" width="0.127" layer="21"/>
+<wire x1="-1.525" y1="-0.875" x2="1.525" y2="-0.875" width="0.127" layer="21"/>
+<wire x1="1.525" y1="-0.875" x2="1.525" y2="0.875" width="0.127" layer="21"/>
+<wire x1="1.525" y1="0.875" x2="-1.525" y2="0.875" width="0.127" layer="21"/>
+<smd name="2" x="0" y="-1.35" dx="0.6" dy="1.5" layer="1"/>
+<smd name="1" x="-0.95" y="-1.35" dx="0.6" dy="1.5" layer="1"/>
+<smd name="3" x="0.95" y="-1.35" dx="0.6" dy="1.5" layer="1"/>
+<smd name="5" x="-0.95" y="1.35" dx="0.6" dy="1.5" layer="1"/>
+<smd name="4" x="0.95" y="1.35" dx="0.6" dy="1.5" layer="1"/>
+<text x="-2" y="-2" size="1" layer="25" font="vector" rot="R90">&gt;NAME</text>
 </package>
 </packages>
 <packages3d>
@@ -4735,39 +4716,22 @@ Datasheet and info: http://www.ebyte.com/en/product-view-news.aspx?id=436</descr
 <wire x1="7.62" y1="5.08" x2="-7.62" y2="5.08" width="0.254" layer="94"/>
 <pin name="P$1" x="0" y="-10.16" length="middle" rot="R90"/>
 </symbol>
-<symbol name="BME280C">
-<pin name="SDO" x="-12.7" y="0" length="middle"/>
-<pin name="CSB" x="12.7" y="0" length="middle" rot="R180"/>
-<pin name="GND" x="12.7" y="5.08" length="middle" rot="R180"/>
-<pin name="SDI" x="12.7" y="-5.08" length="middle" rot="R180"/>
-<pin name="SCK" x="-12.7" y="-5.08" length="middle"/>
-<pin name="VDD" x="-12.7" y="5.08" length="middle"/>
-<wire x1="-7.62" y1="7.62" x2="7.62" y2="7.62" width="0.254" layer="94"/>
-<wire x1="7.62" y1="7.62" x2="7.62" y2="-7.62" width="0.254" layer="94"/>
-<wire x1="7.62" y1="-7.62" x2="-7.62" y2="-7.62" width="0.254" layer="94"/>
-<wire x1="-7.62" y1="-7.62" x2="-7.62" y2="7.62" width="0.254" layer="94"/>
-<text x="-5.08" y="10.16" size="2.286" layer="94" font="vector">&gt;NAME</text>
-</symbol>
-<symbol name="GOOUUUATGM336H">
-<pin name="GND" x="7.62" y="2.54" length="middle" rot="R180"/>
-<pin name="TX" x="7.62" y="-2.54" length="middle" rot="R180"/>
-<pin name="VCC" x="7.62" y="7.62" length="middle" rot="R180"/>
-<pin name="RX" x="7.62" y="-7.62" length="middle" rot="R180"/>
-<wire x1="2.54" y1="10.16" x2="2.54" y2="-10.16" width="0.254" layer="94"/>
-<wire x1="2.54" y1="-10.16" x2="-25.4" y2="-10.16" width="0.254" layer="94"/>
-<wire x1="-25.4" y1="-10.16" x2="-25.4" y2="10.16" width="0.254" layer="94"/>
-<wire x1="-25.4" y1="10.16" x2="2.54" y2="10.16" width="0.254" layer="94"/>
-<wire x1="-22.86" y1="7.62" x2="-22.86" y2="-7.62" width="0.254" layer="94"/>
-<wire x1="-22.86" y1="-7.62" x2="-5.08" y2="-7.62" width="0.254" layer="94"/>
-<wire x1="-5.08" y1="-7.62" x2="-5.08" y2="7.62" width="0.254" layer="94"/>
-<wire x1="-5.08" y1="7.62" x2="-22.86" y2="7.62" width="0.254" layer="94"/>
-<text x="-17.78" y="12.7" size="2.54" layer="94" font="vector">&gt;NAME</text>
-</symbol>
 <symbol name="BUZZER">
-<circle x="0" y="0" radius="5.08" width="0.254" layer="94"/>
 <pin name="+" x="-10.16" y="0" length="middle"/>
 <pin name="-" x="10.16" y="0" length="middle" rot="R180"/>
-<text x="-5.334" y="6.35" size="2.54" layer="94" font="vector">&gt;NAME</text>
+<circle x="0" y="0" radius="5.08" width="0.254" layer="94"/>
+<text x="-6.096" y="6.35" size="2.54" layer="94" font="vector">&gt;NAME</text>
+</symbol>
+<symbol name="LP5907MFX-3.3">
+<pin name="GND" x="-15.24" y="-2.54" length="middle"/>
+<pin name="IN" x="-15.24" y="2.54" length="middle"/>
+<pin name="EN" x="12.7" y="-2.54" length="middle" rot="R180"/>
+<pin name="OUT" x="12.7" y="2.54" length="middle" rot="R180"/>
+<wire x1="-10.16" y1="5.08" x2="-10.16" y2="-5.08" width="0.254" layer="94"/>
+<wire x1="-10.16" y1="-5.08" x2="7.62" y2="-5.08" width="0.254" layer="94"/>
+<wire x1="7.62" y1="-5.08" x2="7.62" y2="5.08" width="0.254" layer="94"/>
+<wire x1="7.62" y1="5.08" x2="-10.16" y2="5.08" width="0.254" layer="94"/>
+<text x="-11.43" y="6.604" size="2.286" layer="94" font="vector">&gt;NAME</text>
 </symbol>
 </symbols>
 <devicesets>
@@ -7142,53 +7106,33 @@ Datasheet and info: http://www.ebyte.com/en/product-view-news.aspx?id=436</descr
 </device>
 </devices>
 </deviceset>
-<deviceset name="BME280CHIP">
-<gates>
-<gate name="BME280" symbol="BME280C" x="0" y="0"/>
-</gates>
-<devices>
-<device name="" package="BME280C">
-<connects>
-<connect gate="BME280" pin="CSB" pad="2"/>
-<connect gate="BME280" pin="GND" pad="1 7"/>
-<connect gate="BME280" pin="SCK" pad="4"/>
-<connect gate="BME280" pin="SDI" pad="3"/>
-<connect gate="BME280" pin="SDO" pad="5"/>
-<connect gate="BME280" pin="VDD" pad="6 8"/>
-</connects>
-<technologies>
-<technology name=""/>
-</technologies>
-</device>
-</devices>
-</deviceset>
-<deviceset name="GOOUUUATGM336H">
-<gates>
-<gate name="GOOUUUATGM336H" symbol="GOOUUUATGM336H" x="0" y="0"/>
-</gates>
-<devices>
-<device name="" package="GOOUUUATGM336H">
-<connects>
-<connect gate="GOOUUUATGM336H" pin="GND" pad="2"/>
-<connect gate="GOOUUUATGM336H" pin="RX" pad="4"/>
-<connect gate="GOOUUUATGM336H" pin="TX" pad="3"/>
-<connect gate="GOOUUUATGM336H" pin="VCC" pad="1"/>
-</connects>
-<technologies>
-<technology name=""/>
-</technologies>
-</device>
-</devices>
-</deviceset>
 <deviceset name="BUZZER">
 <gates>
-<gate name="BUZZER" symbol="BUZZER" x="0" y="0"/>
+<gate name="G$1" symbol="BUZZER" x="0" y="0"/>
 </gates>
 <devices>
 <device name="" package="BUZZER">
 <connects>
-<connect gate="BUZZER" pin="+" pad="+"/>
-<connect gate="BUZZER" pin="-" pad="-"/>
+<connect gate="G$1" pin="+" pad="+"/>
+<connect gate="G$1" pin="-" pad="-"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="LP5907MFX-3.3" uservalue="yes">
+<gates>
+<gate name="LP5907MFX-3.3" symbol="LP5907MFX-3.3" x="0" y="0"/>
+</gates>
+<devices>
+<device name="" package="5PINSOT23">
+<connects>
+<connect gate="LP5907MFX-3.3" pin="EN" pad="3"/>
+<connect gate="LP5907MFX-3.3" pin="GND" pad="2"/>
+<connect gate="LP5907MFX-3.3" pin="IN" pad="1"/>
+<connect gate="LP5907MFX-3.3" pin="OUT" pad="5"/>
 </connects>
 <technologies>
 <technology name=""/>
