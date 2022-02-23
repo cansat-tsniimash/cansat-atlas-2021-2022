@@ -3551,6 +3551,23 @@
 <wire x1="-7" y1="-6" x2="-7" y2="6" width="0.127" layer="21"/>
 <text x="-5" y="0" size="1.27" layer="25" font="vector">ATGM336H</text>
 </package>
+<package name="GT-24-NRF24LO1">
+<wire x1="-7.3" y1="9.065" x2="-7.3" y2="-9.065" width="0.127" layer="21"/>
+<wire x1="-7.3" y1="-9.065" x2="7.3" y2="-9.065" width="0.127" layer="21"/>
+<wire x1="7.3" y1="-9.065" x2="7.3" y2="9.065" width="0.127" layer="21"/>
+<wire x1="7.3" y1="9.065" x2="-7.3" y2="9.065" width="0.127" layer="21"/>
+<text x="-8" y="-4" size="0.8" layer="25" rot="R90">&gt;NAME</text>
+<smd name="5" x="-0.75" y="9" dx="1" dy="3" layer="1"/>
+<smd name="4" x="0.75" y="9" dx="1" dy="3" layer="1"/>
+<smd name="3" x="2.25" y="9" dx="1" dy="3" layer="1"/>
+<smd name="6" x="-2.25" y="9" dx="1" dy="3" layer="1"/>
+<smd name="7" x="-3.75" y="9" dx="1" dy="3" layer="1"/>
+<smd name="2" x="3.75" y="9" dx="1" dy="3" layer="1"/>
+<smd name="1" x="5.25" y="9" dx="1" dy="3" layer="1"/>
+<smd name="8" x="-5.25" y="9" dx="1" dy="3" layer="1"/>
+<smd name="P$9" x="-7" y="0" dx="1.5" dy="8" layer="1"/>
+<smd name="P$10" x="7" y="0" dx="1.5" dy="8" layer="1"/>
+</package>
 </packages>
 <packages3d>
 <package3d name="SOIC8" urn="urn:adsk.eagle:package:8087957/1" type="box">
@@ -4806,6 +4823,23 @@ Datasheet and info: http://www.ebyte.com/en/product-view-news.aspx?id=436</descr
 <wire x1="15.24" y1="7.62" x2="-15.24" y2="7.62" width="0.254" layer="94"/>
 <wire x1="-15.24" y1="7.62" x2="-15.24" y2="-2.54" width="0.254" layer="94"/>
 <text x="-5.08" y="10.16" size="2.54" layer="94">&gt;NAME</text>
+</symbol>
+<symbol name="GT-24-NRF24LO1">
+<pin name="SCK" x="10.16" y="2.54" length="middle" rot="R180"/>
+<pin name="MOSI" x="10.16" y="-2.54" length="middle" rot="R180"/>
+<pin name="CSN" x="10.16" y="7.62" length="middle" rot="R180"/>
+<pin name="MISO" x="10.16" y="-7.62" length="middle" rot="R180"/>
+<pin name="CE" x="10.16" y="12.7" length="middle" rot="R180"/>
+<pin name="IRQ" x="10.16" y="-12.7" length="middle" rot="R180"/>
+<pin name="GND" x="10.16" y="-17.78" length="middle" rot="R180"/>
+<pin name="VCC" x="10.16" y="17.78" length="middle" rot="R180"/>
+<wire x1="5.08" y1="20.32" x2="-2.54" y2="20.32" width="0.254" layer="94"/>
+<wire x1="-2.54" y1="20.32" x2="-2.54" y2="-20.32" width="0.254" layer="94"/>
+<wire x1="-2.54" y1="-20.32" x2="5.08" y2="-20.32" width="0.254" layer="94"/>
+<wire x1="5.08" y1="-20.32" x2="5.08" y2="-17.78" width="0.254" layer="94"/>
+<wire x1="5.08" y1="20.32" x2="5.08" y2="-17.78" width="0.254" layer="94"/>
+<wire x1="5.08" y1="-17.78" x2="7.62" y2="-17.78" width="0.254" layer="94"/>
+<text x="-5.08" y="-12.7" size="2.54" layer="94" rot="R90">&gt;NAME</text>
 </symbol>
 </symbols>
 <devicesets>
@@ -7266,6 +7300,28 @@ Datasheet and info: http://www.ebyte.com/en/product-view-news.aspx?id=436</descr
 <connect gate="G$1" pin="SCLK" pad="CLK"/>
 <connect gate="G$1" pin="VDD" pad="VDD"/>
 <connect gate="G$1" pin="VSS" pad="VSS"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="GT-24-NRF24LO1">
+<gates>
+<gate name="G$1" symbol="GT-24-NRF24LO1" x="0" y="0"/>
+</gates>
+<devices>
+<device name="" package="GT-24-NRF24LO1">
+<connects>
+<connect gate="G$1" pin="CE" pad="2"/>
+<connect gate="G$1" pin="CSN" pad="3"/>
+<connect gate="G$1" pin="GND" pad="8"/>
+<connect gate="G$1" pin="IRQ" pad="7"/>
+<connect gate="G$1" pin="MISO" pad="6"/>
+<connect gate="G$1" pin="MOSI" pad="5"/>
+<connect gate="G$1" pin="SCK" pad="4"/>
+<connect gate="G$1" pin="VCC" pad="1"/>
 </connects>
 <technologies>
 <technology name=""/>
