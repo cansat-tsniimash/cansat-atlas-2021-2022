@@ -3519,6 +3519,38 @@
 <smd name="4" x="0.95" y="1.35" dx="0.6" dy="1.5" layer="1"/>
 <text x="-2" y="-2" size="1" layer="25" font="vector" rot="R90">&gt;NAME</text>
 </package>
+<package name="BME280CHIP">
+<wire x1="-1.25" y1="1.25" x2="-1.25" y2="-1.25" width="0.127" layer="21"/>
+<wire x1="-1.25" y1="-1.25" x2="1.25" y2="-1.25" width="0.127" layer="21"/>
+<wire x1="1.25" y1="-1.25" x2="1.25" y2="1.25" width="0.127" layer="21"/>
+<wire x1="1.25" y1="1.25" x2="-1.25" y2="1.25" width="0.127" layer="21"/>
+<smd name="1" x="1.025" y="0.975" dx="0.5" dy="0.35" layer="1"/>
+<smd name="2" x="1.025" y="0.325" dx="0.5" dy="0.35" layer="1"/>
+<smd name="4" x="1.025" y="-0.975" dx="0.5" dy="0.35" layer="1"/>
+<smd name="3" x="1.025" y="-0.325" dx="0.5" dy="0.35" layer="1"/>
+<smd name="5" x="-1.025" y="-0.975" dx="0.5" dy="0.35" layer="1"/>
+<smd name="8" x="-1.025" y="0.975" dx="0.5" dy="0.35" layer="1"/>
+<smd name="7" x="-1.025" y="0.325" dx="0.5" dy="0.35" layer="1"/>
+<smd name="6" x="-1.025" y="-0.325" dx="0.5" dy="0.35" layer="1"/>
+<text x="-1" y="1.5" size="0.4" layer="25" font="vector">&gt;NAME</text>
+</package>
+<package name="GOOUUUATGM336H">
+<wire x1="-8" y1="7" x2="8" y2="7" width="0.127" layer="21"/>
+<wire x1="8" y1="7" x2="8" y2="-7" width="0.127" layer="21"/>
+<wire x1="8" y1="-7" x2="-8" y2="-7" width="0.127" layer="21"/>
+<wire x1="-8" y1="-7" x2="-8" y2="7" width="0.127" layer="21"/>
+<pad name="1" x="7" y="6" drill="0.6" shape="square"/>
+<pad name="3" x="7" y="0" drill="0.6"/>
+<pad name="2" x="7" y="3" drill="0.6"/>
+<pad name="4" x="7" y="-3" drill="0.6"/>
+<pad name="5" x="7" y="-6" drill="0.6"/>
+<text x="-8" y="8" size="1.27" layer="25" font="vector">&gt;NAME</text>
+<wire x1="-7" y1="6" x2="5" y2="6" width="0.127" layer="21"/>
+<wire x1="5" y1="6" x2="5" y2="-6" width="0.127" layer="21"/>
+<wire x1="5" y1="-6" x2="-7" y2="-6" width="0.127" layer="21"/>
+<wire x1="-7" y1="-6" x2="-7" y2="6" width="0.127" layer="21"/>
+<text x="-5" y="0" size="1.27" layer="25" font="vector">ATGM336H</text>
+</package>
 </packages>
 <packages3d>
 <package3d name="SOIC8" urn="urn:adsk.eagle:package:8087957/1" type="box">
@@ -4732,6 +4764,48 @@ Datasheet and info: http://www.ebyte.com/en/product-view-news.aspx?id=436</descr
 <wire x1="7.62" y1="-5.08" x2="7.62" y2="5.08" width="0.254" layer="94"/>
 <wire x1="7.62" y1="5.08" x2="-10.16" y2="5.08" width="0.254" layer="94"/>
 <text x="-11.43" y="6.604" size="2.286" layer="94" font="vector">&gt;NAME</text>
+</symbol>
+<symbol name="BME280CHIP">
+<pin name="SDI" x="-12.7" y="-2.54" length="middle"/>
+<pin name="CSB" x="-12.7" y="2.54" length="middle"/>
+<pin name="GND" x="-12.7" y="7.62" length="middle"/>
+<pin name="SCK" x="-12.7" y="-7.62" length="middle"/>
+<pin name="VIO" x="12.7" y="0" length="middle" rot="R180"/>
+<pin name="VDD" x="12.7" y="5.08" length="middle" rot="R180"/>
+<pin name="SDO" x="12.7" y="-5.08" length="middle" rot="R180"/>
+<wire x1="-7.62" y1="10.16" x2="7.62" y2="10.16" width="0.254" layer="94"/>
+<wire x1="7.62" y1="10.16" x2="7.62" y2="-10.16" width="0.254" layer="94"/>
+<wire x1="7.62" y1="-10.16" x2="-7.62" y2="-10.16" width="0.254" layer="94"/>
+<wire x1="-7.62" y1="-10.16" x2="-7.62" y2="10.16" width="0.254" layer="94"/>
+<text x="-5.08" y="12.7" size="2.54" layer="94" font="vector">&gt;NAME</text>
+</symbol>
+<symbol name="GOOUUUATGM336H">
+<wire x1="2.54" y1="10.16" x2="2.54" y2="-10.16" width="0.254" layer="94"/>
+<pin name="GND" x="7.62" y="2.54" length="middle" rot="R180"/>
+<pin name="TX" x="7.62" y="-2.54" length="middle" rot="R180"/>
+<pin name="VCC" x="7.62" y="7.62" length="middle" rot="R180"/>
+<pin name="RX" x="7.62" y="-7.62" length="middle" rot="R180"/>
+<wire x1="2.54" y1="10.16" x2="-25.4" y2="10.16" width="0.254" layer="94"/>
+<wire x1="-25.4" y1="10.16" x2="-25.4" y2="-10.16" width="0.254" layer="94"/>
+<wire x1="-25.4" y1="-10.16" x2="2.54" y2="-10.16" width="0.254" layer="94"/>
+<wire x1="-22.86" y1="7.62" x2="-5.08" y2="7.62" width="0.254" layer="94"/>
+<wire x1="-5.08" y1="7.62" x2="-5.08" y2="-7.62" width="0.254" layer="94"/>
+<wire x1="-5.08" y1="-7.62" x2="-22.86" y2="-7.62" width="0.254" layer="94"/>
+<wire x1="-22.86" y1="-7.62" x2="-22.86" y2="7.62" width="0.254" layer="94"/>
+<text x="-25.4" y="12.7" size="2.54" layer="94">&gt;NAME</text>
+</symbol>
+<symbol name="SD-SPI">
+<pin name="VDD" x="-2.54" y="-7.62" length="middle" rot="R90"/>
+<pin name="SCLK" x="2.54" y="-7.62" length="middle" rot="R90"/>
+<pin name="DI" x="-7.62" y="-7.62" length="middle" rot="R90"/>
+<pin name="VSS" x="7.62" y="-7.62" length="middle" rot="R90"/>
+<pin name="CS" x="-12.7" y="-7.62" length="middle" rot="R90"/>
+<pin name="DO" x="12.7" y="-7.62" length="middle" rot="R90"/>
+<wire x1="-15.24" y1="-2.54" x2="15.24" y2="-2.54" width="0.254" layer="94"/>
+<wire x1="15.24" y1="-2.54" x2="15.24" y2="7.62" width="0.254" layer="94"/>
+<wire x1="15.24" y1="7.62" x2="-15.24" y2="7.62" width="0.254" layer="94"/>
+<wire x1="-15.24" y1="7.62" x2="-15.24" y2="-2.54" width="0.254" layer="94"/>
+<text x="-5.08" y="10.16" size="2.54" layer="94">&gt;NAME</text>
 </symbol>
 </symbols>
 <devicesets>
@@ -7133,6 +7207,65 @@ Datasheet and info: http://www.ebyte.com/en/product-view-news.aspx?id=436</descr
 <connect gate="LP5907MFX-3.3" pin="GND" pad="2"/>
 <connect gate="LP5907MFX-3.3" pin="IN" pad="1"/>
 <connect gate="LP5907MFX-3.3" pin="OUT" pad="5"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="BME280CHIP">
+<gates>
+<gate name="G$1" symbol="BME280CHIP" x="0" y="0"/>
+</gates>
+<devices>
+<device name="" package="BME280CHIP">
+<connects>
+<connect gate="G$1" pin="CSB" pad="2"/>
+<connect gate="G$1" pin="GND" pad="1 7"/>
+<connect gate="G$1" pin="SCK" pad="4"/>
+<connect gate="G$1" pin="SDI" pad="3"/>
+<connect gate="G$1" pin="SDO" pad="5"/>
+<connect gate="G$1" pin="VDD" pad="8"/>
+<connect gate="G$1" pin="VIO" pad="6"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="GOOUUUATGM336H">
+<gates>
+<gate name="G$1" symbol="GOOUUUATGM336H" x="0" y="0"/>
+</gates>
+<devices>
+<device name="" package="GOOUUUATGM336H">
+<connects>
+<connect gate="G$1" pin="GND" pad="4"/>
+<connect gate="G$1" pin="RX" pad="2"/>
+<connect gate="G$1" pin="TX" pad="3"/>
+<connect gate="G$1" pin="VCC" pad="5"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="SD-SPI">
+<gates>
+<gate name="G$1" symbol="SD-SPI" x="0" y="0"/>
+</gates>
+<devices>
+<device name="" package="SD">
+<connects>
+<connect gate="G$1" pin="CS" pad="DAT3"/>
+<connect gate="G$1" pin="DI" pad="CMD"/>
+<connect gate="G$1" pin="DO" pad="DAT0"/>
+<connect gate="G$1" pin="SCLK" pad="CLK"/>
+<connect gate="G$1" pin="VDD" pad="VDD"/>
+<connect gate="G$1" pin="VSS" pad="VSS"/>
 </connects>
 <technologies>
 <technology name=""/>
