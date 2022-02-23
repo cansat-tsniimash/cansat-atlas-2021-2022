@@ -4,6 +4,7 @@
 
 #include <stm32f4xx_hal.h>
 #include "nRF24L01_PL/nrf24_lower_api.h"
+#include "nRF24L01_PL/nrf24_upper_api.h"
 
 extern SPI_HandleTypeDef hspi2;
 /*
@@ -246,58 +247,30 @@ int app_main()
 
 	// в первую очередь настроим модуль
 	// переходим в power down
-	uint8_t config_pd = 0x08;
-	nrf24_write_register(NRF24_REGADDR_CONFIG, &config_pd, 1);
-	print_register(NRF24_REGADDR_CONFIG, &config_pd);
+	nrf24_mode_power_down();
 
-	//Включаем все FEATURES
-	uint8_t features = 0;
-	features = (1 << 2) | (1 << 1) | (1 << 0);
-	nrf24_write_register(NRF24_REGADDR_FEATURE, &features, 1);
-	print_register(NRF24_REGADDR_FEATURE, &features);
+	// Настройки радиопередачи
+	nrf24_rf_config_t nrf24_rf_config;
+	nrf24_rf_config.data_rate = NRF24_DATARATE_2000_MBIT;
+	nrf24_rf_config.rf_channel = 25;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
+	nrf24_setup_rf(&nrf24_rf_config);
+
+	// Настроили протокол
+	nrf24_protocol_config_t nrf24_protocol_config;
+	nrf24_protocol_config.address_width = NRF24_ADDRES_WIDTH_5_BYTES;
+	nrf24_protocol_config.auto_retransmit_count = 10;
+	nrf24_protocol_config.auto_retransmit_delay = 0;
+	nrf24_protocol_config.crc_size = NRF24_CRCSIZE_1BYTE;
+	nrf24_protocol_config.en_ack_payload = true;
+	nrf24_protocol_config.en_dyn_ack = true;
+	nrf24_protocol_config.en_dyn_payload_size = true;
+	nrf24_setup_protocol(&nrf24_protocol_config);
 
 	// Теперь нужно установить адрес пайпа на который мы будем передавать
-	uint64_t tx_addr = 0xacacacacac;
-	nrf24_write_register(NRF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr), 5); // 5 байт на адрес без доп настроек
-	print_register(NRF24_REGADDR_TX_ADDR, (uint8_t *)(&tx_addr));
+	nrf24_pipe_set_tx_addr(0xacacacacac);
 
-	// Выставляем мощность и частоту
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	uint8_t rf_setup = 0;
-	//Скорость на 250 кбит
-	rf_setup &= ~NRF24_RFSETUP_RF_DR_HIGH;
-	rf_setup |= NRF24_RFSETUP_RF_DR_LOW;
-	// МАКСИМАЛЬНАЯ МОЩНОСТЬ
-	rf_setup &= ~(NRF24_RFSETUP_RF_PWR_MASK << NRF24_RFSETUP_RF_PWR_OFFSET);
-	rf_setup |= (0x03 & NRF24_RFSETUP_RF_PWR_MASK) << NRF24_RFSETUP_RF_PWR_OFFSET;
-	nrf24_write_register(NRF24_REGADDR_RF_SETUP, &rf_setup, 1);
-	print_register(NRF24_REGADDR_RF_SETUP, (uint8_t*)&rf_setup);
-
-	// частота считается как 2400 МГц + канал
-	// встанем на 2437 - 6ой канал Wi-Fi
-	uint8_t rf_channel = 118;
-    nrf24_write_register(NRF24_REGADDR_RF_CH, &rf_channel, 1);
-	print_register(NRF24_REGADDR_RF_CH, &rf_channel);
-
-	rf_setup = 0x3f;
-	nrf24_write_register(NRF24_REGADDR_DYNPD, &rf_setup, 1);
-
-	// по-умолчанию включено аж 2 пайпа на приём и для них включены авто ACK
-	// Сейчас у нас не будет приёмника, поэтому модуль будет отправлять пакет
-	// несколько раз и будет говорить что отправка не удалась.
-	// Ну и фиг с ним!
-
-	// Начнем с конфигурационного регистра
-	// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-	uint8_t cfg_reg = 0;
-	cfg_reg &= ~NRF24_CONFIG_PRIM_RX; // Будем передатчиком
-	cfg_reg |= NRF24_CONFIG_PWR_UP; // Не будем спать
-	cfg_reg |= NRF24_CONFIG_EN_CRC; // Будем использовать контрольную сумму
-	cfg_reg &= ~NRF24_CONFIG_CRCO;  // 1 байт на контрольную сумму
-	// Прерывания не используем и даже трогать на будем
-	nrf24_write_register(NRF24_REGADDR_CONFIG, &cfg_reg, 1);
-	print_register(NRF24_REGADDR_CONFIG, &cfg_reg);
-
+	nrf24_mode_standby();
 
 	printf("configured\n");
 	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
@@ -306,8 +279,6 @@ int app_main()
 	//while(1) {}
 
 	int packet_number = 0;
-	//nrf24_ce_activate(true);
-	// TODO: вычитать статус и посмотреть что там происходит
 	while(1)
 	{
 		uint8_t payload[32] = {'H', 'e', 'l', 'l', 'o', ',', ' ', 'T', 'i', 'm', 'o', 'f', 'e', 'i', '!'};
@@ -315,23 +286,17 @@ int app_main()
 		// Запишем пайлоад строкой
 		//snprintf(payload, sizeof(payload), "packet no %d", packet_number);
 
-
-
-		// загоняем на радио
-		// Мы не включали динамических размеров пейлоада, поэтому гоним целиком 32 байта
-		// с нулями
-		nrf24_flush_tx();
-		nrf24_write_tx_payload(payload, sizeof(payload), false);
+		nrf24_fifo_write(payload, sizeof(payload), false);
 
 		printf("status_after_w_tx_clear\n");
 		read_regs();
 
 		// дергаем CE на 10мкс чтобы начать передачу.
 		// МЫ не умеем по микросекундам, поэтому дернем на миллисекунду
+		nrf24_mode_tx();
 		HAL_Delay(10);
-		nrf24_ce_activate(false);
+		nrf24_mode_standby();
 		HAL_Delay(1);
-		nrf24_ce_activate(true);
 
 		printf("status_after_ce_activate_clear\n");
 		read_regs();
@@ -344,8 +309,7 @@ int app_main()
 		printf("status_before_clear\n");
 		read_regs();
 
-		uint8_t irq_clear = (1 << 6) | (1 << 5) | (1 << 4);
-		nrf24_write_register(NRF24_REGADDR_STATUS, &irq_clear, 1);
+		nrf24_irq_clear(NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 
 		printf("status_after_clear\n");
 		read_regs();
