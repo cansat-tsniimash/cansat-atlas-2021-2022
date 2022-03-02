@@ -251,7 +251,7 @@ int app_main()
 
 	// Настройки радиопередачи
 	nrf24_rf_config_t nrf24_rf_config;
-	nrf24_rf_config.data_rate = NRF24_DATARATE_2000_MBIT;
+	nrf24_rf_config.data_rate = NRF24_DATARATE_2000_KBIT;
 	nrf24_rf_config.rf_channel = 25;
 	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
 	nrf24_setup_rf(&nrf24_rf_config);
@@ -270,6 +270,15 @@ int app_main()
 	// Теперь нужно установить адрес пайпа на который мы будем передавать
 	nrf24_pipe_set_tx_addr(0xacacacacac);
 
+	nrf24_pipe_config_t pipe_config;
+	pipe_config.address = 0xafafafafaf;
+	pipe_config.enable_auto_ack = false;
+	pipe_config.payload_size = -1;
+	for(int i = 0 ; i < 6 ; i++)
+	{
+		pipe_config.address += i;
+		nrf24_pipe_rx_start(i, &pipe_config);
+	}
 	nrf24_mode_standby();
 
 	printf("configured\n");
@@ -281,7 +290,7 @@ int app_main()
 	int packet_number = 0;
 	while(1)
 	{
-		uint8_t payload[32] = {'H', 'e', 'l', 'l', 'o', ',', ' ', 'T', 'i', 'm', 'o', 'f', 'e', 'i', '!'};
+		uint8_t payload[32] = {'H', 'e', 'l', 'l', 'o', ',', ' ', 'T', 'i', 'm', 'o', 'f', 'e', 'i', '!', '!'};
 
 		// Запишем пайлоад строкой
 		//snprintf(payload, sizeof(payload), "packet no %d", packet_number);
@@ -304,7 +313,7 @@ int app_main()
 
 		// Подождем сколько-то пока пакет отправляется
 		// Пускай будет 100 мс
-		HAL_Delay(100);
+		//HAL_Delay(100);
 
 		printf("status_before_clear\n");
 		read_regs();
