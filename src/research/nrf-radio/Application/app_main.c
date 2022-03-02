@@ -259,8 +259,8 @@ int app_main()
 	// Настроили протокол
 	nrf24_protocol_config_t nrf24_protocol_config;
 	nrf24_protocol_config.address_width = NRF24_ADDRES_WIDTH_5_BYTES;
-	nrf24_protocol_config.auto_retransmit_count = 10;
-	nrf24_protocol_config.auto_retransmit_delay = 0;
+	nrf24_protocol_config.auto_retransmit_count = 15;
+	nrf24_protocol_config.auto_retransmit_delay = 15;
 	nrf24_protocol_config.crc_size = NRF24_CRCSIZE_1BYTE;
 	nrf24_protocol_config.en_ack_payload = true;
 	nrf24_protocol_config.en_dyn_ack = true;
@@ -271,8 +271,8 @@ int app_main()
 	nrf24_pipe_set_tx_addr(0xacacacacac);
 
 	nrf24_pipe_config_t pipe_config;
-	pipe_config.address = 0xafafafafaf;
-	pipe_config.enable_auto_ack = false;
+	pipe_config.address = 0xacacacacac;
+	pipe_config.enable_auto_ack = true;
 	pipe_config.payload_size = -1;
 	for(int i = 0 ; i < 6 ; i++)
 	{
@@ -280,6 +280,7 @@ int app_main()
 		nrf24_pipe_rx_start(i, &pipe_config);
 	}
 	nrf24_mode_standby();
+	nrf24_mode_tx();
 
 	printf("configured\n");
 	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
@@ -294,20 +295,14 @@ int app_main()
 
 		// Запишем пайлоад строкой
 		//snprintf(payload, sizeof(payload), "packet no %d", packet_number);
+		nrf24_fifo_write(payload, sizeof(payload), true);
 
-		nrf24_fifo_write(payload, sizeof(payload), false);
-
-		printf("status_after_w_tx_clear\n");
+		//printf("status_after_w_tx_\n");
 		read_regs();
 
 		// дергаем CE на 10мкс чтобы начать передачу.
 		// МЫ не умеем по микросекундам, поэтому дернем на миллисекунду
-		nrf24_mode_tx();
-		HAL_Delay(10);
-		nrf24_mode_standby();
-		HAL_Delay(1);
-
-		printf("status_after_ce_activate_clear\n");
+		//printf("status_after_ce_activate\n");
 		read_regs();
 
 
@@ -315,13 +310,31 @@ int app_main()
 		// Пускай будет 100 мс
 		//HAL_Delay(100);
 
-		printf("status_before_clear\n");
+		uint8_t packet_sizee = 0 ;
+		uint8_t pipe_noo = 0 ;
+		bool tx_full_pr = 0 ;
+		uint8_t buffer_rx[32];
+		nrf24_fifo_peek(&packet_sizee, &pipe_noo, &tx_full_pr);
+		printf("%d\n", packet_sizee);
+		if (packet_sizee != 0)
+		{
+			nrf24_fifo_read(buffer_rx, sizeof(buffer_rx));
+			for (int i = 0; i < packet_sizee; i++)
+			{
+				printf("%c", buffer_rx[i]);
+		    }
+			printf("\n");
+		}
+
+		//printf("status_before_clear\n");
 		read_regs();
 
 		nrf24_irq_clear(NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 
-		printf("status_after_clear\n");
+		//printf("status_after_clear\n");
 		read_regs();
+
+
 
 		// Увеличиваем номер пакета
 		packet_number++;
@@ -398,6 +411,7 @@ static void print_register(uint8_t reg_addr, uint8_t * reg_data)
 
 	if (NULL == selected_param)
 	{
+
 		printf("invalid reg addr: %d\n", reg_addr);
 		return;
 	}
