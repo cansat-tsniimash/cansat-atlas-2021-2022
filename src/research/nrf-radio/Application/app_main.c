@@ -187,6 +187,8 @@ typedef struct
 #define FEATURE 0x1D
 
 
+
+
 /*
 static void send_command(uint8_t command){
 	// Опускаем chip select для того, что бы начать общение с конкретным устройством.
@@ -217,18 +219,18 @@ void nrf24l01_get_config(nrf24l01_config_t *nrf_config)
 }*/
 
 
-static void dump_registers(void);
+static void dump_registers(void * inf_ptr);
 //static
 void print_bits(uint8_t value, char * buffer);
 static void print_register(uint8_t reg_addr, uint8_t * reg_data);
 
 // Only for debug
-void read_regs()
+void read_regs(void * inf_ptr)
 {
 	uint8_t status;
 	uint8_t obs_tx;
-	nrf24_get_status(&status);
-	nrf24_read_register(NRF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
+	nrf24_get_status(inf_ptr, &status);
+	nrf24_read_register(inf_ptr, NRF24_REGADDR_OBSERVE_TX, &obs_tx, 1);
 	print_register(NRF24_REGADDR_STATUS, &status);
 	print_register(NRF24_REGADDR_OBSERVE_TX, &obs_tx);
 }
@@ -237,82 +239,113 @@ int app_main()
 {
 	// Работаем по приложению A даташита. Что нужно сделать чтобы передавать
 
+	nrf24_lower_api_config_t api_config;
+	api_config.hspi = &hspi2;
+	api_config.ce_port = GPIOA;
+	api_config.ce_pin = GPIO_PIN_1;
+	api_config.cs_port = GPIOA;
+	api_config.cs_pin = GPIO_PIN_0;
+
 	HAL_Delay(100);
 
 	printf("starting\n");
 	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
-	dump_registers();
+	dump_registers(&api_config);
 	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
 	//while(1) {}
 
+
+
 	// в первую очередь настроим модуль
 	// переходим в power down
-	nrf24_mode_power_down();
+	nrf24_mode_power_down(&api_config);
 
 	// Настройки радиопередачи
 	nrf24_rf_config_t nrf24_rf_config;
-	nrf24_rf_config.data_rate = NRF24_DATARATE_2000_MBIT;
+	nrf24_rf_config.data_rate = NRF24_DATARATE_2000_KBIT;
 	nrf24_rf_config.rf_channel = 25;
 	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
-	nrf24_setup_rf(&nrf24_rf_config);
+	nrf24_setup_rf(&api_config, &nrf24_rf_config);
 
 	// Настроили протокол
 	nrf24_protocol_config_t nrf24_protocol_config;
 	nrf24_protocol_config.address_width = NRF24_ADDRES_WIDTH_5_BYTES;
-	nrf24_protocol_config.auto_retransmit_count = 10;
-	nrf24_protocol_config.auto_retransmit_delay = 0;
+	nrf24_protocol_config.auto_retransmit_count = 15;
+	nrf24_protocol_config.auto_retransmit_delay = 15;
 	nrf24_protocol_config.crc_size = NRF24_CRCSIZE_1BYTE;
 	nrf24_protocol_config.en_ack_payload = true;
 	nrf24_protocol_config.en_dyn_ack = true;
 	nrf24_protocol_config.en_dyn_payload_size = true;
-	nrf24_setup_protocol(&nrf24_protocol_config);
+	nrf24_setup_protocol(&api_config, &nrf24_protocol_config);
 
 	// Теперь нужно установить адрес пайпа на который мы будем передавать
-	nrf24_pipe_set_tx_addr(0xacacacacac);
+	nrf24_pipe_set_tx_addr(&api_config, 0xacacacacac);
 
-	nrf24_mode_standby();
+	nrf24_pipe_config_t pipe_config;
+	pipe_config.address = 0xacacacacac;
+	pipe_config.enable_auto_ack = true;
+	pipe_config.payload_size = -1;
+	for(int i = 0 ; i < 6 ; i++)
+	{
+		pipe_config.address += i;
+		nrf24_pipe_rx_start(&api_config, i, &pipe_config);
+	}
+	nrf24_mode_standby(&api_config);
+	nrf24_mode_tx(&api_config);
 
 	printf("configured\n");
 	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
-	dump_registers();
+	dump_registers(&api_config);
 	printf("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n");
 	//while(1) {}
 
 	int packet_number = 0;
 	while(1)
 	{
-		uint8_t payload[32] = {'H', 'e', 'l', 'l', 'o', ',', ' ', 'T', 'i', 'm', 'o', 'f', 'e', 'i', '!'};
+		uint8_t payload[32] = {'H', 'e', 'l', 'l', 'o', ',', ' ', 'T', 'i', 'm', 'o', 'f', 'e', 'i', '!', '!'};
 
 		// Запишем пайлоад строкой
 		//snprintf(payload, sizeof(payload), "packet no %d", packet_number);
+		nrf24_fifo_write(&api_config, payload, sizeof(payload), true);
 
-		nrf24_fifo_write(payload, sizeof(payload), false);
-
-		printf("status_after_w_tx_clear\n");
-		read_regs();
+		//printf("status_after_w_tx_\n");
+		read_regs(&api_config);
 
 		// дергаем CE на 10мкс чтобы начать передачу.
 		// МЫ не умеем по микросекундам, поэтому дернем на миллисекунду
-		nrf24_mode_tx();
-		HAL_Delay(10);
-		nrf24_mode_standby();
-		HAL_Delay(1);
-
-		printf("status_after_ce_activate_clear\n");
-		read_regs();
+		//printf("status_after_ce_activate\n");
+		read_regs(&api_config);
 
 
 		// Подождем сколько-то пока пакет отправляется
 		// Пускай будет 100 мс
-		HAL_Delay(100);
+		//HAL_Delay(100);
 
-		printf("status_before_clear\n");
-		read_regs();
+		uint8_t packet_sizee = 0 ;
+		uint8_t pipe_noo = 0 ;
+		bool tx_full_pr = 0 ;
+		uint8_t buffer_rx[32];
+		nrf24_fifo_peek(&api_config, &packet_sizee, &pipe_noo, &tx_full_pr);
+		printf("%d\n", packet_sizee);
+		if (packet_sizee != 0)
+		{
+			nrf24_fifo_read(&api_config, buffer_rx, sizeof(buffer_rx));
+			for (int i = 0; i < packet_sizee; i++)
+			{
+				printf("%c", buffer_rx[i]);
+		    }
+			printf("\n");
+		}
 
-		nrf24_irq_clear(NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
+		//printf("status_before_clear\n");
+		read_regs(&api_config);
 
-		printf("status_after_clear\n");
-		read_regs();
+		nrf24_irq_clear(&api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
+
+		//printf("status_after_clear\n");
+		read_regs(&api_config);
+
+
 
 		// Увеличиваем номер пакета
 		packet_number++;
@@ -389,6 +422,7 @@ static void print_register(uint8_t reg_addr, uint8_t * reg_data)
 
 	if (NULL == selected_param)
 	{
+
 		printf("invalid reg addr: %d\n", reg_addr);
 		return;
 	}
@@ -415,7 +449,7 @@ static void print_register(uint8_t reg_addr, uint8_t * reg_data)
 	printf("\n");
 }
 
-static void dump_registers(void)
+static void dump_registers(void *intf_ptr)
 {
 	const size_t regs_count = sizeof(reg_params)/sizeof(reg_params[0]);
 	for (size_t i = 0 ; i < regs_count; i++)
@@ -424,7 +458,7 @@ static void dump_registers(void)
 		uint8_t reg_size = reg_params[i].size;
 
 		uint8_t reg_data[5] = { 0 };
-		nrf24_read_register(reg_addr, reg_data, reg_size);
+		nrf24_read_register(intf_ptr, reg_addr, reg_data, reg_size);
 
 		print_register(reg_addr, reg_data);
 	}
