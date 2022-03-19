@@ -57,6 +57,20 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define CS_BME280_Pin GPIO_PIN_13
+#define CS_BME280_GPIO_Port GPIOC
+#define CS_LSM6DS3_Pin GPIO_PIN_14
+#define CS_LSM6DS3_GPIO_Port GPIOC
+#define CS_NRF24L01_Pin GPIO_PIN_15
+#define CS_NRF24L01_GPIO_Port GPIOC
+#define TOMA_Pin GPIO_PIN_0
+#define TOMA_GPIO_Port GPIOB
+#define BUZZER_Pin GPIO_PIN_1
+#define BUZZER_GPIO_Port GPIOB
+#define CS_SD_Pin GPIO_PIN_12
+#define CS_SD_GPIO_Port GPIOB
+#define CE_NRF24L01_Pin GPIO_PIN_10
+#define CE_NRF24L01_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

@@ -24,4 +24,5 @@ Application \
 Core/Src \
 Core/Startup \
 Drivers/STM32F1xx_HAL_Driver/Src \
+stm32f1/nRF24L01_PL/src \
 
