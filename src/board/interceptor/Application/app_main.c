@@ -10,9 +10,59 @@
 
 extern SPI_HandleTypeDef hspi1;
 
+#pragma pack(push,1)
+typedef struct
+{
+	uint8_t flag;
+	uint16_t num;
+	uint32_t time;
+
+	uint32_t BME280_presqure;
+	uint8_t BME280_temperature;
+	uint16_t BME280_humidity;
+
+	int16_t LSM6DSL_accelerometer_x;
+	int16_t LSM6DSL_accelerometer_y;
+	int16_t LSM6DSL_accelerometer_z;
+
+	int16_t LSM6DSL_gyroscope_x;
+	int16_t LSM6DSL_gyroscope_y;
+	int16_t LSM6DSL_gyroscope_z;
+
+	uint16_t sum;
+
+}packet_da_type_1_t;
+
+
+typedef struct
+{
+	uint8_t flag;
+	uint16_t num;
+	uint32_t time;
+
+    float latitude;
+    float longitude;
+    int16_t height;
+    uint8_t fix;
+
+    uint8_t state;
+
+	uint16_t sum;
+}packet_da_type_2_t;
+#pragma pack(pop)
+
+
 
 int app_main()
 {
+	//создаем структуру пакетов
+	packet_da_type_1_t packet_da_type_1 = {0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0};
+	packet_da_type_2_t packet_da_type_2 = {0, 2, 0, 4, 0, 6, 0, 8, 0};
+
+	//поднимаем флаги для определения пакетов
+	packet_da_type_1.flag = 0xfa;
+	packet_da_type_2.flag = 0xfb;
+
 	nrf24_lower_api_config_t nrf24_api_config;
 	nrf24_api_config.hspi = &hspi1;
 	nrf24_api_config.ce_port = GPIOA;
@@ -49,6 +99,8 @@ int app_main()
 
 	nrf24_mode_standby(&nrf24_api_config);
 
+	uint8_t rx_buffer[32];
+
 	nrf24_fifo_status_t rx_status = 0;
     nrf24_fifo_status_t tx_status = 0;
 	nrf24_mode_rx(&nrf24_api_config);
@@ -58,8 +110,18 @@ int app_main()
 
 		if (rx_status != NRF24_FIFO_EMPTY)
 		{
-
+			nrf24_fifo_read(&nrf24_api_config, rx_buffer, 32);
 		}
+
+        if (tx_status != NRF24_FIFO_EMPTY)
+        {
+    	    //nrf24_fifo_flush_tx(&nrf24_api_config);
+        }
+        nrf24_fifo_write_ack_pld(&nrf24_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
+        nrf24_fifo_write_ack_pld(&nrf24_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
+
+        //опускаем флаги
+        nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 
     }
 	return 0;
