@@ -61,6 +61,8 @@ void Error_Handler(void);
 #define cs_GPIO_Port GPIOA
 #define ce_Pin GPIO_PIN_1
 #define ce_GPIO_Port GPIOA
+#define photorezistor_Pin GPIO_PIN_4
+#define photorezistor_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

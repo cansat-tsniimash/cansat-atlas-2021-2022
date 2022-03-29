@@ -7,8 +7,12 @@
 #include "config.h"
 #include "nRF24L01_PL/nrf24_upper_api.h"
 #include "nRF24L01_PL/nrf24_lower_api_stm32.h"
+#include "Photorezistor/photorezistor.h"
+#include "ATGM336H/nmea_gps.h"
 
 extern SPI_HandleTypeDef hspi2;
+extern ADC_HandleTypeDef hadc1;
+extern UART_HandleTypeDef huart6;
 
 typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
 {
@@ -51,7 +55,6 @@ typedef struct
 
 }packet_ma_type_1_t;
 
-
 typedef struct
 {
 	uint8_t flag;
@@ -66,6 +69,7 @@ typedef struct
     float longitude;
     int16_t height;
     uint8_t fix;
+    float phortsistor;
 
     uint8_t state;
 
@@ -75,6 +79,9 @@ typedef struct
 
 int app_main()
 {
+	//инициализация гпс
+	gps_init();
+
 	packet_ma_type_1_t packet_ma_type_1 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	packet_ma_type_2_t packet_ma_type_2 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	packet_ma_type_1.flag = 0xff;
@@ -86,6 +93,13 @@ int app_main()
 	nrf24_api_config.ce_pin = GPIO_PIN_1;
 	nrf24_api_config.cs_port = GPIOA;
 	nrf24_api_config.cs_pin = GPIO_PIN_0;
+
+	//заполнение структуры на фоторезистор
+	photorezistor_t photoresistor;
+	//сопротивление (R)
+	photoresistor.resist = 5100;
+	//hadc1 - дискриптор с начтройками АЦП
+	photoresistor.hadc = &hadc1;
 
 	nrf24_mode_power_down(&nrf24_api_config);
 	// Настройки радиопередачи
@@ -129,6 +143,9 @@ int app_main()
 
 	while(1)
 	{
+		//кладем значение освещенности в поля пакета
+		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
+		printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);
 		switch (state_now)
 		{
 		case STATE_ON_GROUND:
