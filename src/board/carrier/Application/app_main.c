@@ -93,6 +93,9 @@ int app_main()
 
 	//инициализация гпс
 	gps_init();
+	__HAL_UART_ENABLE_IT(&huart6, UART_IT_RXNE);
+	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_ERR);
+
 
 	packet_ma_type_1_t packet_ma_type_1 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	packet_ma_type_2_t packet_ma_type_2 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -156,7 +159,7 @@ int app_main()
 	float lux_rn = 0;
 	float lux_sun = 0;
 
-	uint8_t gps_buf;//создаем переменную в который будут гнаться байты с юарта
+
 
 	    //создаем переменные для записи телеметрии gps
 		int64_t cookie;
@@ -166,17 +169,6 @@ int app_main()
 
 	while(1)
 	{
-		//printf("%d", (int)gps_buf);
-		while(1)
-		{
-			HAL_StatusTypeDef resul_t = HAL_UART_Receive(&huart6, &gps_buf, 1, 10);
-			if (resul_t != HAL_OK) {
-				break;
-			}
-			gps_push_byte(gps_buf);
-		}
-
-
 
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt);
