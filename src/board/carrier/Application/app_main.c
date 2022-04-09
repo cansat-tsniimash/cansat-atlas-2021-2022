@@ -9,10 +9,18 @@
 #include "nRF24L01_PL/nrf24_lower_api_stm32.h"
 #include "Photorezistor/photorezistor.h"
 #include "ATGM336H/nmea_gps.h"
+#include "../stm32f4/ATGM336H/nmea_gps.h"
+
+#define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
+#define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
+#define TIME_WAIT_BTN_PHOTOREZ 5000
+#define KOF 0.8
 
 extern SPI_HandleTypeDef hspi2;
 extern ADC_HandleTypeDef hadc1;
 extern UART_HandleTypeDef huart6;
+
+
 
 typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
 {
@@ -24,7 +32,9 @@ typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
 
 typedef enum//ОПИСЫВАЕМ СОСТОЯНИЕ ПОЛЕТА
 {
+	STATE_INIT,
 	STATE_ON_GROUND,
+	STATE_WAIT,
 	STATE_IN_RN,
 	STATE_AFTER_SEPARATION,
 	STATE_MINOR_DEVICE_SEPARATION,
@@ -79,6 +89,8 @@ typedef struct
 
 int app_main()
 {
+	uint32_t time_btn_now = HAL_GetTick();
+
 	//инициализация гпс
 	gps_init();
 
@@ -133,7 +145,7 @@ int app_main()
 
 	uint8_t da_1_rx_buffer[32];
 	uint32_t start_time = 0;
-	state_t state_now = STATE_ON_GROUND;
+	state_t state_now = STATE_INIT;
 	nrf24_state_t nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
 	motor_on();
 	nrf24_fifo_status_t rx_status;
@@ -141,27 +153,83 @@ int app_main()
 	int comp;
 	uint8_t da_1_resp_count = 0;
 
+	float lux_rn = 0;
+	float lux_sun = 0;
+
+	uint8_t gps_buf;//создаем переменную в который будут гнаться байты с юарта
+
+	    //создаем переменные для записи телеметрии gps
+		int64_t cookie;
+		float lat ;
+		float lon;
+		float alt;
+
 	while(1)
 	{
+		//printf("%d", (int)gps_buf);
+		while(1)
+		{
+			HAL_StatusTypeDef resul_t = HAL_UART_Receive(&huart6, &gps_buf, 1, 10);
+			if (resul_t != HAL_OK) {
+				break;
+			}
+			gps_push_byte(gps_buf);
+		}
+
+
+
+		gps_work();
+		gps_get_coords(&cookie,  & lat,  & lon,& alt);
+		printf("широта %ld\n ",(int32_t)lat);
+		printf("долгота %ld\n ",(int32_t)lon);
+		printf("высота %ld\n ",(int32_t)alt);
+		printf("%d ", (int)cookie);
+
 		//кладем значение освещенности в поля пакета
 		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
-		printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);
+		//printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);
 		switch (state_now)
 		{
+		case STATE_INIT:
+			if (check_out_board_trigger() == false)
+			{
+				lux_sun = photorezistor_get_lux(photoresistor);
+				state_now = STATE_ON_GROUND;
+			}
+		    break;
+
 		case STATE_ON_GROUND:
 			if (check_out_board_trigger() == true)
 			{
-				state_now = STATE_IN_RN;
+				state_now = STATE_WAIT;
 			}
+
 			break;
+
+		case STATE_WAIT:
+			time_btn_now = HAL_GetTick();
+		    if(time_btn_now > start_time + TIME_WAIT_BTN_PHOTOREZ)
+		    {
+				state_now = STATE_IN_RN;
+				lux_rn = photorezistor_get_lux(photoresistor);
+		    }
+		    break;
+
 		case STATE_IN_RN:
 			//добавит ожидание освещенности
-			state_now = STATE_AFTER_SEPARATION;
+
+			packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
+			if ((lux_sun-lux_rn)*KOF < packet_ma_type_2.phortsistor-lux_rn)
+			{
+				state_now = STATE_AFTER_SEPARATION;
+			}
 			break;
+
 		case STATE_AFTER_SEPARATION:
 			//ждем достижения восыты
 			state_now = STATE_MINOR_DEVICE_SEPARATION;
 			break;
+
 		case STATE_MINOR_DEVICE_SEPARATION:
 			motor_on();
 			start_time = HAL_GetTick();
@@ -172,6 +240,7 @@ int app_main()
 			}
 
 			break;
+
 		case STATE_SEPARATED:
 			//общение с ДА
 			break;
@@ -185,6 +254,7 @@ int app_main()
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), false);
 			    nrf24_state_now = STATE_SEND_PACKET_TO_GCS;
 			    break;
+
 	        case STATE_SEND_PACKET_TO_GCS:
 	     	    nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
 	            if(tx_status == NRF24_FIFO_EMPTY)
@@ -193,12 +263,14 @@ int app_main()
 	            	da_1_resp_count = 0;
 	            }
 	            break;
+
 	        case STATE_BUILD_PACKET_TO_DA_1 :
 	        	da_1_resp_count++;
-	        	printf("ДА, лови маслину\n");
+	        	//printf("ДА, лови маслину\n");
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), true);
 			    nrf24_state_now = STATE_SEND_PACKET_TO_DA_1;
+
 	        case STATE_SEND_PACKET_TO_DA_1:
 	        	nrf24_irq_get(&nrf24_api_config, &comp);
 
@@ -209,13 +281,13 @@ int app_main()
 	        		{
 	        			for(int i =0 ; i < packet_size ; i++)
 	        			{
-	        				printf("%i ", da_1_rx_buffer[i]);
+	        				//printf("%i ", da_1_rx_buffer[i]);
 	        			}
-	        			printf("\n");
+	        			//printf("\n");
 	        		}
 	        		else
 	        		{
-        				printf("пакета нету, гуляй\n");
+        				//printf("пакета нету, гуляй\n");
 	        		}
 	        		if (da_1_resp_count >= 2)
 	        			nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
@@ -224,7 +296,7 @@ int app_main()
 	        	}
 	        	if (comp & NRF24_IRQ_MAX_RT)
 	        	{
-	        		printf("!!!ОШИБКА!!!\n");
+	        		//printf("!!!ОШИБКА!!!\n");
 	        		if (da_1_resp_count > 2)
 	        			nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
 	        		else
@@ -234,6 +306,6 @@ int app_main()
 		nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}
 	return 0;
-}
+    }
 
 
