@@ -113,15 +113,11 @@ int app_main()
 
     //создаем переменные для записи телеметрии gps
 	int64_t cookie = 0;
-	float lat = 0 ;
-	float lon = 0;
-	float alt = 0;
-
 	while(true)
 	{
 
 		gps_work();
-		gps_get_coords(&cookie,  & lat,  & lon,& alt);
+		gps_get_coords(&cookie,  &packet_da_type_2_t.latitude ,  & packet_da_type_2_t.longitude,& packet_da_type_2_t.alt);
 
 
 		nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
