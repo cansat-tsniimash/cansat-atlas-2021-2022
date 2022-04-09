@@ -46,6 +46,7 @@
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
+int gps_push_byte(uint8_t byte);
 
 /* USER CODE END PFP */
 
@@ -203,9 +204,13 @@ void SysTick_Handler(void)
   */
 void USART3_IRQHandler(void)
 {
+
   /* USER CODE BEGIN USART3_IRQn 0 */
 	  __disable_irq();
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
 	  volatile int x = huart3.Instance->SR;
+#pragma GCC diagnostic pop
 	  volatile uint16_t byte = huart3.Instance->DR;
 	  __enable_irq();
 
