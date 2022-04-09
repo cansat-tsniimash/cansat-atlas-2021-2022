@@ -7,6 +7,8 @@
 
 #include "nRF24L01_PL/nrf24_upper_api.h"
 #include "nRF24L01_PL/nrf24_lower_api_stm32.h"
+#include "ATGM336H/nmea_gps.h"
+extern UART_HandleTypeDef huart3;
 
 extern SPI_HandleTypeDef hspi1;
 
@@ -42,7 +44,7 @@ typedef struct
 
     float latitude;
     float longitude;
-    int16_t height;
+    float height;
     uint8_t fix;
 
     uint8_t state;
@@ -55,6 +57,10 @@ typedef struct
 
 int app_main()
 {
+	//инициализация гпс
+	gps_init();
+	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);
+
 	//создаем структуру пакетов
 	packet_da_type_1_t packet_da_type_1 = {0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0};
 	packet_da_type_2_t packet_da_type_2 = {0, 2, 0, 4, 0, 6, 0, 8, 0};
@@ -104,8 +110,20 @@ int app_main()
 	nrf24_fifo_status_t rx_status = 0;
     nrf24_fifo_status_t tx_status = 0;
 	nrf24_mode_rx(&nrf24_api_config);
+
+    //создаем переменные для записи телеметрии gps
+	int64_t cookie = 0;
+	float lat = 0 ;
+	float lon = 0;
+	float alt = 0;
+
 	while(true)
 	{
+
+		gps_work();
+		gps_get_coords(&cookie,  & lat,  & lon,& alt);
+
+
 		nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
 
 		if (rx_status != NRF24_FIFO_EMPTY)
