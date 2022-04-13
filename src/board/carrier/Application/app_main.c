@@ -9,7 +9,8 @@
 #include "nRF24L01_PL/nrf24_lower_api_stm32.h"
 #include "Photorezistor/photorezistor.h"
 #include "ATGM336H/nmea_gps.h"
-#include "../stm32f4/ATGM336H/nmea_gps.h"
+#include "BME280/DriverForBME280.h"
+#include <math.h>
 
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
 #define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
@@ -48,9 +49,9 @@ typedef struct
 	uint16_t num;
 	uint32_t time;
 
-	uint32_t BME280_presqure;
-	uint8_t BME280_temperature;
-	uint16_t BME280_humidity;
+	float BME280_pressure;
+	float BME280_temperature;
+	float BME280_humidity;
 
 	uint8_t DS18B20_temperature;
 	int16_t LSM6DSL_accelerometer_x;
@@ -87,9 +88,19 @@ typedef struct
 }packet_ma_type_2_t;
 #pragma pack(pop)
 
+
 int app_main()
 {
+	struct bme280_dev bme = {0};	//инициализируем настройки бме280
+	struct bme_spi_intf bme280_buffer;
+	bme280_buffer.GPIO_Port = GPIOB;
+	bme280_buffer.GPIO_Pin = GPIO_PIN_3;
+	bme280_buffer.spi =  &hspi2;
+	bme_init_default(&bme, &bme280_buffer);
+    uint16_t height;
+
 	uint32_t time_btn_now = HAL_GetTick();
+
 
 	//инициализация гпс
 	gps_init();
@@ -166,16 +177,26 @@ int app_main()
 		float lat ;
 		float lon;
 		float alt;
+		struct bme280_data comp_data = {0};
 
 	while(1)
 	{
+		comp_data = bme_read_data(&bme);
+		packet_ma_type_1.BME280_pressure = (float)comp_data.pressure;
+		packet_ma_type_1.BME280_temperature = (float)comp_data.temperature;
+		packet_ma_type_1.BME280_humidity = (float)comp_data.humidity;
+		printf("давл %ld\n ",(int32_t)packet_ma_type_1.BME280_pressure);
+		printf("темп %ld\n ",(int32_t)packet_ma_type_1.BME280_temperature);
+		printf("влажность %ld\n ",(int32_t)packet_ma_type_1.BME280_humidity);
+
 
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt);
-		printf("широта %ld\n ",(int32_t)lat);
+		/*printf("широта %ld\n ",(int32_t)lat);
 		printf("долгота %ld\n ",(int32_t)lon);
 		printf("высота %ld\n ",(int32_t)alt);
-		printf("%d ", (int)cookie);
+		printf("%d ", (int)cookie);*/
+
 
 		//кладем значение освещенности в поля пакета
 		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
