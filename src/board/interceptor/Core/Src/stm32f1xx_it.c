@@ -204,7 +204,6 @@ void SysTick_Handler(void)
   */
 void USART3_IRQHandler(void)
 {
-
   /* USER CODE BEGIN USART3_IRQn 0 */
 	  __disable_irq();
 #pragma GCC diagnostic push

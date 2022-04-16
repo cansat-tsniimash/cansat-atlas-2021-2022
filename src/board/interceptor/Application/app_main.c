@@ -8,6 +8,9 @@
 #include "nRF24L01_PL/nrf24_upper_api.h"
 #include "nRF24L01_PL/nrf24_lower_api_stm32.h"
 #include "ATGM336H/nmea_gps.h"
+#include <math.h>
+#include "BME280/DriverForBME280.h"
+
 extern UART_HandleTypeDef huart3;
 
 extern SPI_HandleTypeDef hspi1;
@@ -19,7 +22,7 @@ typedef struct
 	uint16_t num;
 	uint32_t time;
 
-	uint32_t BME280_presqure;
+	uint32_t BME280_pressure;
 	uint8_t BME280_temperature;
 	uint16_t BME280_humidity;
 
@@ -57,6 +60,18 @@ typedef struct
 
 int app_main()
 {
+	//берем изначальное давление для барометрической формулы
+	uint32_t pressure_on_ground;
+
+	float height_BME280 = 0;
+	struct bme280_dev bme = {0};	//инициализируем настройки бме280
+	struct bme_spi_intf bme280_buffer;
+	bme280_buffer.GPIO_Port = GPIOC;
+	bme280_buffer.GPIO_Pin = GPIO_PIN_13;
+	bme280_buffer.spi =  &hspi1;
+	bme_init_default(&bme, &bme280_buffer);
+
+
 	//инициализация гпс
 	gps_init();
 	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);
@@ -111,13 +126,29 @@ int app_main()
     nrf24_fifo_status_t tx_status = 0;
 	nrf24_mode_rx(&nrf24_api_config);
 
-    //создаем переменные для записи телеметрии gps
-	int64_t cookie = 0;
+	int64_t cookie;
+	struct bme280_data comp_data = {0};
+	comp_data = bme_read_data(&bme);
+	pressure_on_ground = (float)comp_data.pressure;
+
+	float height_on_BME280 = 0;
 	while(true)
 	{
 
+		comp_data = bme_read_data(&bme);
+		packet_da_type_1.BME280_pressure = comp_data.pressure;
+		packet_da_type_1.BME280_temperature = comp_data.temperature;
+		packet_da_type_1.BME280_humidity = comp_data.humidity;
+
+		height_on_BME280 = 44330*(1 - pow((float)packet_da_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
+
+		printf("высота %ld\n ",(int32_t)(height_on_BME280*100));
+		printf("давл %ld\n ",(int32_t)packet_da_type_1.BME280_pressure);
+		printf("темп %ld\n ",(int32_t)packet_da_type_1.BME280_temperature);
+		printf("влажность %ld\n ",(int32_t)packet_da_type_1.BME280_humidity);
+
 		gps_work();
-		gps_get_coords(&cookie,  &packet_da_type_2_t.latitude ,  & packet_da_type_2_t.longitude,& packet_da_type_2_t.alt);
+		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height);
 
 
 		nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
