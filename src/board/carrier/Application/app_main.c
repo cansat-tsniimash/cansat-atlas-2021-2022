@@ -10,6 +10,7 @@
 #include "Photorezistor/photorezistor.h"
 #include "ATGM336H/nmea_gps.h"
 #include "BME280/DriverForBME280.h"
+#include "Shift_Register/shift_reg.h"
 #include <math.h>
 
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
@@ -25,7 +26,9 @@ extern UART_HandleTypeDef huart6;
 
 typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
 {
+
     STATE_BUILD_PACKET_TO_GCS,
+
 	STATE_SEND_PACKET_TO_GCS,
 	STATE_BUILD_PACKET_TO_DA_1,
 	STATE_SEND_PACKET_TO_DA_1
@@ -91,21 +94,47 @@ typedef struct
 
 int app_main()
 {
-	struct bme280_dev bme = {0};	//инициализируем настройки бме280
+	shift_reg_t shift_reg_sens;
+	shift_reg_sens.bus = &hspi2;
+	shift_reg_sens.latch_port = GPIOC;
+	shift_reg_sens.latch_pin = GPIO_PIN_1;
+	shift_reg_sens.oe_port = GPIOC;
+	shift_reg_sens.oe_pin = GPIO_PIN_13;
+
+	shift_reg_init(&shift_reg_sens);
+	shift_reg_write_8(&shift_reg_sens, 0xff);
+
+	shift_reg_t shift_reg_nrf;
+	shift_reg_nrf.bus = &hspi2;
+	shift_reg_nrf.latch_port = GPIOC;
+	shift_reg_nrf.latch_pin = GPIO_PIN_4;
+	shift_reg_nrf.oe_port = GPIOC;
+	shift_reg_nrf.oe_pin = GPIO_PIN_5;
+
+	shift_reg_init(&shift_reg_nrf);
+	shift_reg_write_8(&shift_reg_nrf, 0xff);
+	nrf24_spi_pins_sr_t nrf24_spi_pins_sr;
+	nrf24_spi_pins_sr.pos_CE = 0;
+	nrf24_spi_pins_sr.pos_CS = 1;
+	nrf24_spi_pins_sr.this = &shift_reg_nrf;
+	nrf24_lower_api_config_t nrf24_api_config;
+	nrf24_spi_init_sr(&nrf24_api_config, &hspi2, &nrf24_spi_pins_sr);
+
+	/*struct bme280_dev bme = {0};	//инициализируем настройки бме280
 	struct bme_spi_intf bme280_buffer;
 	bme280_buffer.GPIO_Port = GPIOB;
 	bme280_buffer.GPIO_Pin = GPIO_PIN_3;
 	bme280_buffer.spi =  &hspi2;
 	bme_init_default(&bme, &bme280_buffer);
-    uint16_t height;
+    uint16_t height;*/
 
-	uint32_t time_btn_now = HAL_GetTick();
+	//uint32_t time_btn_now = HAL_GetTick();
 
 
 	//инициализация гпс
-	gps_init();
+	/*gps_init();
 	__HAL_UART_ENABLE_IT(&huart6, UART_IT_RXNE);
-	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_ERR);
+	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_ERR);*/
 
 
 	packet_ma_type_1_t packet_ma_type_1 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -113,19 +142,14 @@ int app_main()
 	packet_ma_type_1.flag = 0xff;
 	packet_ma_type_2.flag = 0xfe;
 
-	nrf24_lower_api_config_t nrf24_api_config;
-	nrf24_api_config.hspi = &hspi2;
-	nrf24_api_config.ce_port = GPIOA;
-	nrf24_api_config.ce_pin = GPIO_PIN_1;
-	nrf24_api_config.cs_port = GPIOA;
-	nrf24_api_config.cs_pin = GPIO_PIN_0;
 
-	//заполнение структуры на фоторезистор
+
+	/*//заполнение структуры на фоторезистор
 	photorezistor_t photoresistor;
 	//сопротивление (R)
 	photoresistor.resist = 5100;
 	//hadc1 - дискриптор с начтройками АЦП
-	photoresistor.hadc = &hadc1;
+	photoresistor.hadc = &hadc1;*/
 
 	nrf24_mode_power_down(&nrf24_api_config);
 	// Настройки радиопередачи
@@ -181,16 +205,16 @@ int app_main()
 
 	while(1)
 	{
-		comp_data = bme_read_data(&bme);
+		/*comp_data = bme_read_data(&bme);
 		packet_ma_type_1.BME280_pressure = (float)comp_data.pressure;
 		packet_ma_type_1.BME280_temperature = (float)comp_data.temperature;
 		packet_ma_type_1.BME280_humidity = (float)comp_data.humidity;
 		printf("давл %ld\n ",(int32_t)packet_ma_type_1.BME280_pressure);
 		printf("темп %ld\n ",(int32_t)packet_ma_type_1.BME280_temperature);
-		printf("влажность %ld\n ",(int32_t)packet_ma_type_1.BME280_humidity);
+		printf("влажность %ld\n ",(int32_t)packet_ma_type_1.BME280_humidity);*/
 
 
-		gps_work();
+		/*gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt);
 		/*printf("широта %ld\n ",(int32_t)lat);
 		printf("долгота %ld\n ",(int32_t)lon);
@@ -199,9 +223,9 @@ int app_main()
 
 
 		//кладем значение освещенности в поля пакета
-		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
+		//packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
 		//printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);
-		switch (state_now)
+		/*switch (state_now)
 		{
 		case STATE_INIT:
 			if (check_out_board_trigger() == false)
@@ -257,7 +281,7 @@ int app_main()
 		case STATE_SEPARATED:
 			//общение с ДА
 			break;
-		}
+		}*/
 
 	    switch (nrf24_state_now)
 	    {

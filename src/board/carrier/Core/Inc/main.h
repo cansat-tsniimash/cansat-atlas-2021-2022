@@ -57,14 +57,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define cs_Pin GPIO_PIN_0
-#define cs_GPIO_Port GPIOA
-#define ce_Pin GPIO_PIN_1
-#define ce_GPIO_Port GPIOA
-#define photorezistor_Pin GPIO_PIN_4
-#define photorezistor_GPIO_Port GPIOA
-#define bme280_Pin GPIO_PIN_3
-#define bme280_GPIO_Port GPIOB
+#define WIRE_1_PIN_Pin GPIO_PIN_1
+#define WIRE_1_PIN_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
