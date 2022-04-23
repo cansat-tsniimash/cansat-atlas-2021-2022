@@ -7,6 +7,7 @@
 #include "config.h"
 #include "nRF24L01_PL/nrf24_upper_api.h"
 #include "nRF24L01_PL/nrf24_lower_api_stm32.h"
+#include "nRF24L01_PL/nrf24_lower_api.h"
 #include "Photorezistor/photorezistor.h"
 #include "ATGM336H/nmea_gps.h"
 #include "BME280/DriverForBME280.h"
@@ -91,6 +92,108 @@ typedef struct
 }packet_ma_type_2_t;
 #pragma pack(pop)
 
+typedef struct reg_param_t
+{
+	uint8_t addr;
+	const char * name;
+	uint8_t size;
+} reg_param_t;
+
+static reg_param_t reg_params[] = {
+	{ NRF24_REGADDR_CONFIG, "NRF24_REGADDR_CONFIG",			1},
+	{ NRF24_REGADDR_EN_AA, "NRF24_REGADDR_EN_AA",				1},
+	{ NRF24_REGADDR_EN_RXADDR, "NRF24_REGADDR_EN_RXADDR",		1},
+	{ NRF24_REGADDR_SETUP_AW, "NRF24_REGADDR_SETUP_AW",		1},
+	{ NRF24_REGADDR_SETUP_RETR, "NRF24_REGADDR_SETUP_RETR",	1},
+	{ NRF24_REGADDR_RF_CH, "NRF24_REGADDR_RF_CH",				1},
+	{ NRF24_REGADDR_RF_SETUP, "NRF24_REGADDR_RF_SETUP",		1},
+	{ NRF24_REGADDR_STATUS, "NRF24_REGADDR_STATUS",			1},
+	{ NRF24_REGADDR_OBSERVE_TX, "NRF24_REGADDR_OBSERVE_TX",	1},
+	{ NRF24_REGADDR_RPD, "NRF24_REGADDR_RPD",					1},
+	{ NRF24_REGADDR_RX_ADDR_P0, "NRF24_REGADDR_RX_ADDR_P0",	5},
+	{ NRF24_REGADDR_RX_ADDR_P1, "NRF24_REGADDR_RX_ADDR_P1",	5},
+	{ NRF24_REGADDR_RX_ADDR_P2, "NRF24_REGADDR_RX_ADDR_P2",	1},
+	{ NRF24_REGADDR_RX_ADDR_P3, "NRF24_REGADDR_RX_ADDR_P3",	1},
+	{ NRF24_REGADDR_RX_ADDR_P4, "NRF24_REGADDR_RX_ADDR_P4",	1},
+	{ NRF24_REGADDR_RX_ADDR_P5, "NRF24_REGADDR_RX_ADDR_P5",	1},
+	{ NRF24_REGADDR_TX_ADDR, "NRF24_REGADDR_TX_ADDR",			5},
+	{ NRF24_REGADDR_RX_PW_P0, "NRF24_REGADDR_RX_PW_P0",		1},
+	{ NRF24_REGADDR_RX_PW_P1, "NRF24_REGADDR_RX_PW_P1",		1},
+	{ NRF24_REGADDR_RX_PW_P2, "NRF24_REGADDR_RX_PW_P2",		1},
+	{ NRF24_REGADDR_RX_PW_P3, "NRF24_REGADDR_RX_PW_P3",		1},
+	{ NRF24_REGADDR_RX_PW_P4, "NRF24_REGADDR_RX_PW_P4",		1},
+	{ NRF24_REGADDR_RX_PW_P5, "NRF24_REGADDR_RX_PW_P5",		1},
+	{ NRF24_REGADDR_FIFO_STATUS, "NRF24_REGADDR_FIFO_STATUS", 1},
+	{ NRF24_REGADDR_DYNPD, "NRF24_REGADDR_DYNPD",				1},
+	{ NRF24_REGADDR_FEATURE, "NRF24_REGADDR_FEATURE",			1}
+};
+//static
+void print_bits(uint8_t value, char * buffer)
+{
+	for (size_t i = 0; i < sizeof(value)*8; i++)
+	{
+		int bit = value & (0x01 << 7);
+		sprintf(buffer, "%d", bit ? 1 : 0);
+		value = value << 1;
+		buffer += 1;
+	}
+}
+static void print_register(uint8_t reg_addr, uint8_t * reg_data)
+{
+	reg_param_t * selected_param = NULL;
+	for (size_t i = 0; i < sizeof(reg_params)/sizeof(reg_params[0]); i++)
+	{
+		if (reg_addr == reg_params[i].addr)
+		{
+			selected_param  = &reg_params[i];
+			break;
+		}
+	}
+
+	if (NULL == selected_param)
+	{
+
+		printf("invalid reg addr: %d\n", reg_addr);
+		return;
+	}
+
+	const char * reg_name = selected_param->name;
+	const size_t reg_size = selected_param->size;
+
+	printf("reg %s (0x%02X) = ", reg_name, (int)reg_addr);
+	if (1 == reg_size)
+	{
+		printf("0x%02X", reg_data[0]);
+		char bits_buffer[10] = {0};
+		print_bits(reg_data[0], bits_buffer);
+		printf(" (0b%s)", bits_buffer);
+	}
+	else
+	{
+		printf("0x");
+		for (size_t j = 0; j < reg_size; j++)
+		{
+			printf("%02X", reg_data[j]);
+		}
+	}
+	printf("\n");
+}
+static void dump_registers(void *intf_ptr)
+{
+	const size_t regs_count = sizeof(reg_params)/sizeof(reg_params[0]);
+	for (size_t i = 0 ; i < regs_count; i++)
+	{
+		uint8_t reg_addr = reg_params[i].addr;
+		uint8_t reg_size = reg_params[i].size;
+
+		uint8_t reg_data[5] = { 0 };
+		nrf24_read_register(intf_ptr, reg_addr, reg_data, reg_size);
+
+		print_register(reg_addr, reg_data);
+	}
+}
+
+
 
 int app_main()
 {
@@ -113,6 +216,9 @@ int app_main()
 
 	shift_reg_init(&shift_reg_nrf);
 	shift_reg_write_8(&shift_reg_nrf, 0xff);
+	shift_reg_write_8(&shift_reg_nrf, 0x00);
+	shift_reg_write_8(&shift_reg_nrf, 0xff);
+
 	nrf24_spi_pins_sr_t nrf24_spi_pins_sr;
 	nrf24_spi_pins_sr.pos_CE = 0;
 	nrf24_spi_pins_sr.pos_CS = 1;
@@ -185,7 +291,7 @@ int app_main()
 	uint32_t start_time = 0;
 	state_t state_now = STATE_INIT;
 	nrf24_state_t nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
-	motor_on();
+	//motor_on();
 	nrf24_fifo_status_t rx_status;
 	nrf24_fifo_status_t tx_status;
 	int comp;
@@ -196,12 +302,13 @@ int app_main()
 
 
 
-	    //создаем переменные для записи телеметрии gps
-		int64_t cookie;
-		float lat ;
-		float lon;
-		float alt;
-		struct bme280_data comp_data = {0};
+	//создаем переменные для записи телеметрии gps
+	int64_t cookie;
+	float lat ;
+	float lon;
+	float alt;
+	struct bme280_data comp_data = {0};
+	dump_registers(&nrf24_api_config);
 
 	while(1)
 	{
@@ -282,11 +389,11 @@ int app_main()
 			//общение с ДА
 			break;
 		}*/
-
-	    switch (nrf24_state_now)
+		nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
+	    /*switch (nrf24_state_now)
 	    {
 	        case STATE_BUILD_PACKET_TO_GCS:
-	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xacacacacac);
+	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), false);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), false);
 			    nrf24_state_now = STATE_SEND_PACKET_TO_GCS;
@@ -318,13 +425,13 @@ int app_main()
 	        		{
 	        			for(int i =0 ; i < packet_size ; i++)
 	        			{
-	        				//printf("%i ", da_1_rx_buffer[i]);
+	        				printf("%i ", da_1_rx_buffer[i]);
 	        			}
-	        			//printf("\n");
+	        			printf("\n");
 	        		}
 	        		else
 	        		{
-        				//printf("пакета нету, гуляй\n");
+        				printf("пакета нету, гуляй\n");
 	        		}
 	        		if (da_1_resp_count >= 2)
 	        			nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
@@ -339,8 +446,9 @@ int app_main()
 	        		else
 						nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
 	        	}
-	    }
-		nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
+	    }*/
+	    //dump_registers(&nrf24_api_config);
+		//nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}
 	return 0;
     }
