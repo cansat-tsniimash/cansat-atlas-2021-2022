@@ -13,6 +13,7 @@
 #include "BME280/DriverForBME280.h"
 #include "Shift_Register/shift_reg.h"
 #include <math.h>
+#include "LSM6DS3/DLSM.h"
 
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
 #define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
@@ -55,16 +56,12 @@ typedef struct
 
 	float BME280_pressure;
 	float BME280_temperature;
-	float BME280_humidity;
 
 	uint8_t DS18B20_temperature;
-	int16_t LSM6DSL_accelerometer_x;
-	int16_t LSM6DSL_accelerometer_y;
-	int16_t LSM6DSL_accelerometer_z;
 
-	int16_t LSM6DSL_gyroscope_x;
-	int16_t LSM6DSL_gyroscope_y;
-	int16_t LSM6DSL_gyroscope_z;
+	int16_t acc_mg [3];
+
+    int16_t gyro_mdps [3];
 
 	uint16_t sum;
 
@@ -203,7 +200,6 @@ int app_main()
 	shift_reg_sens.latch_pin = GPIO_PIN_1;
 	shift_reg_sens.oe_port = GPIOC;
 	shift_reg_sens.oe_pin = GPIO_PIN_13;
-
 	shift_reg_init(&shift_reg_sens);
 	shift_reg_write_8(&shift_reg_sens, 0xff);
 
@@ -213,11 +209,22 @@ int app_main()
 	shift_reg_nrf.latch_pin = GPIO_PIN_4;
 	shift_reg_nrf.oe_port = GPIOC;
 	shift_reg_nrf.oe_pin = GPIO_PIN_5;
-
 	shift_reg_init(&shift_reg_nrf);
 	shift_reg_write_8(&shift_reg_nrf, 0xff);
-	shift_reg_write_8(&shift_reg_nrf, 0x00);
-	shift_reg_write_8(&shift_reg_nrf, 0xff);
+
+	stmdev_ctx_t ctx = {0};
+ 	lsm_spi_intf_sr spi_interface;
+	spi_interface.spi = &hspi2;
+	spi_interface.sr_pin = 4;
+	spi_interface.sr = &shift_reg_sens;
+	lsmset_sr(&ctx, &spi_interface);
+
+	struct bme280_dev bme = {0};	//инициализируем настройки бме280
+	bme_spi_intf_sr spi_intf;
+	spi_intf.spi = &hspi2;
+	spi_intf.sr = &shift_reg_sens;
+	spi_intf.sr_pin = 2;
+	bme_init_default_sr(&bme, &spi_intf);
 
 	nrf24_spi_pins_sr_t nrf24_spi_pins_sr;
 	nrf24_spi_pins_sr.pos_CE = 0;
@@ -225,37 +232,6 @@ int app_main()
 	nrf24_spi_pins_sr.this = &shift_reg_nrf;
 	nrf24_lower_api_config_t nrf24_api_config;
 	nrf24_spi_init_sr(&nrf24_api_config, &hspi2, &nrf24_spi_pins_sr);
-
-	/*struct bme280_dev bme = {0};	//инициализируем настройки бме280
-	struct bme_spi_intf bme280_buffer;
-	bme280_buffer.GPIO_Port = GPIOB;
-	bme280_buffer.GPIO_Pin = GPIO_PIN_3;
-	bme280_buffer.spi =  &hspi2;
-	bme_init_default(&bme, &bme280_buffer);
-    uint16_t height;*/
-
-	//uint32_t time_btn_now = HAL_GetTick();
-
-
-	//инициализация гпс
-	/*gps_init();
-	__HAL_UART_ENABLE_IT(&huart6, UART_IT_RXNE);
-	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_ERR);*/
-
-
-	packet_ma_type_1_t packet_ma_type_1 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	packet_ma_type_2_t packet_ma_type_2 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	packet_ma_type_1.flag = 0xff;
-	packet_ma_type_2.flag = 0xfe;
-
-
-
-	/*//заполнение структуры на фоторезистор
-	photorezistor_t photoresistor;
-	//сопротивление (R)
-	photoresistor.resist = 5100;
-	//hadc1 - дискриптор с начтройками АЦП
-	photoresistor.hadc = &hadc1;*/
 
 	nrf24_mode_power_down(&nrf24_api_config);
 	// Настройки радиопередачи
@@ -284,30 +260,51 @@ int app_main()
 	pipe_config.payload_size = -1;
 	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
 
-	nrf24_mode_standby(&nrf24_api_config);
-	nrf24_mode_tx(&nrf24_api_config);
+	//заполнение структуры на фоторезистор
+	//photorezistor_t photoresistor;
+	//сопротивление (R)
+	//photoresistor.resist = 5100;
+	//hadc1 - дискриптор с начтройками АЦП
+	//photoresistor.hadc = &hadc1;
 
+	//инициализация гпс
+	//gps_init();
+	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_RXNE);
+	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_ERR);
+
+	packet_ma_type_1_t packet_ma_type_1 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	packet_ma_type_2_t packet_ma_type_2 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	packet_ma_type_1.flag = 0xff;
+	packet_ma_type_2.flag = 0xfe;
+    uint16_t height;
+	uint32_t time_btn_now = HAL_GetTick();
 	uint8_t da_1_rx_buffer[32];
 	uint32_t start_time = 0;
 	state_t state_now = STATE_INIT;
 	nrf24_state_t nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
-	//motor_on();
 	nrf24_fifo_status_t rx_status;
 	nrf24_fifo_status_t tx_status;
 	int comp;
 	uint8_t da_1_resp_count = 0;
-
 	float lux_rn = 0;
 	float lux_sun = 0;
-
-
-
 	//создаем переменные для записи телеметрии gps
-	int64_t cookie;
+	/*int64_t cookie;
 	float lat ;
 	float lon;
 	float alt;
+	*/
 	struct bme280_data comp_data = {0};
+	float temperature_celsius_gyro = 0;
+    float acc_g [3];
+    float gyro_dps [3];
+
+	nrf24_mode_standby(&nrf24_api_config);
+	nrf24_mode_tx(&nrf24_api_config);
+
+	//motor_on();
+
+
 	dump_registers(&nrf24_api_config);
 
 	while(1)
@@ -315,23 +312,33 @@ int app_main()
 		/*comp_data = bme_read_data(&bme);
 		packet_ma_type_1.BME280_pressure = (float)comp_data.pressure;
 		packet_ma_type_1.BME280_temperature = (float)comp_data.temperature;
-		packet_ma_type_1.BME280_humidity = (float)comp_data.humidity;
-		printf("давл %ld\n ",(int32_t)packet_ma_type_1.BME280_pressure);
+		lsmread(&ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
+
+		for (int i= 0; i < 3 ; i++)
+		{
+			packet_ma_type_1.acc_mg[i] = (int16_t)(acc_g[i]*1000);
+		}
+
+		for (int i = 0; i < 3 ; i++)
+		{
+			packet_ma_type_1.gyro_mdps[i] = (int16_t)(gyro_dps[i]*1000);
+		}*/
+		/*printf("давл %ld\n ",(int32_t)packet_ma_type_1.BME280_pressure);
 		printf("темп %ld\n ",(int32_t)packet_ma_type_1.BME280_temperature);
-		printf("влажность %ld\n ",(int32_t)packet_ma_type_1.BME280_humidity);*/
+		printf("влажность %ld\n ",(int32_t)packet_ma_type_1.BME280_humidity);
 
 
-		/*gps_work();
+
+		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt);
-		/*printf("широта %ld\n ",(int32_t)lat);
+		printf("широта %ld\n ",(int32_t)lat);
 		printf("долгота %ld\n ",(int32_t)lon);
 		printf("высота %ld\n ",(int32_t)alt);
-		printf("%d ", (int)cookie);*/
-
-
+		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
-		//packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
-		//printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);
+		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
+		printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);*/
+
 		/*switch (state_now)
 		{
 		case STATE_INIT:
@@ -447,7 +454,7 @@ int app_main()
 						nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
 	        	}
 	    }*/
-	    //dump_registers(&nrf24_api_config);
+	    dump_registers(&nrf24_api_config);
 		//nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}
 	return 0;
