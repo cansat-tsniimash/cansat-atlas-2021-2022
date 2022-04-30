@@ -268,9 +268,9 @@ int app_main()
 	//photoresistor.hadc = &hadc1;
 
 	//инициализация гпс
-	//gps_init();
-	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_RXNE);
-	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_ERR);
+	gps_init();
+	__HAL_UART_ENABLE_IT(&huart6, UART_IT_RXNE);
+	__HAL_UART_ENABLE_IT(&huart6, UART_IT_ERR);
 
 	packet_ma_type_1_t packet_ma_type_1 = {0};
 	packet_ma_type_2_t packet_ma_type_2 = {0};
@@ -289,11 +289,10 @@ int app_main()
 	float lux_rn = 0;
 	float lux_sun = 0;
 	//создаем переменные для записи телеметрии gps
-	/*int64_t cookie;
+	int64_t cookie;
 	float lat ;
 	float lon;
 	float alt;
-	*/
 	struct bme280_data comp_data = {0};
 	float temperature_celsius_gyro = 0;
     float acc_g [3];
@@ -328,16 +327,16 @@ int app_main()
 		printf("темп %ld\n ",(int32_t)packet_ma_type_1.BME280_temperature);
 
 
-/*
+
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt);
-		printf("широта %ld\n ",(int32_t)lat);
-		printf("долгота %ld\n ",(int32_t)lon);
-		printf("высота %ld\n ",(int32_t)alt);
+		packet_ma_type_2.latitude = lat;
+		packet_ma_type_2.longitude = lon;
+		packet_ma_type_2.height = (int16_t)(alt*100);
 		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
-		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
-		printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);*/
+		//packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
+		//printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);
 
 		/*switch (state_now)
 		{
