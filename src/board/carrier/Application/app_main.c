@@ -236,8 +236,8 @@ int app_main()
 	nrf24_mode_power_down(&nrf24_api_config);
 	// Настройки радиопередачи
 	nrf24_rf_config_t nrf24_rf_config;
-	nrf24_rf_config.data_rate = NRF24_DATARATE_2000_KBIT;
-	nrf24_rf_config.rf_channel = 25;
+	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
+	nrf24_rf_config.rf_channel = 100;
 	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
 	nrf24_setup_rf(&nrf24_api_config, &nrf24_rf_config);
 
@@ -272,8 +272,8 @@ int app_main()
 	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_RXNE);
 	//__HAL_UART_ENABLE_IT(&huart6, UART_IT_ERR);
 
-	packet_ma_type_1_t packet_ma_type_1 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	packet_ma_type_2_t packet_ma_type_2 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	packet_ma_type_1_t packet_ma_type_1 = {0};
+	packet_ma_type_2_t packet_ma_type_2 = {0};
 	packet_ma_type_1.flag = 0xff;
 	packet_ma_type_2.flag = 0xfe;
     uint16_t height;
@@ -298,7 +298,8 @@ int app_main()
 	float temperature_celsius_gyro = 0;
     float acc_g [3];
     float gyro_dps [3];
-
+    uint16_t packet_num_1 = 0;
+    uint16_t packet_num_2 = 0;
 	nrf24_mode_standby(&nrf24_api_config);
 	nrf24_mode_tx(&nrf24_api_config);
 
@@ -309,7 +310,7 @@ int app_main()
 
 	while(1)
 	{
-		/*comp_data = bme_read_data(&bme);
+		comp_data = bme_read_data(&bme);
 		packet_ma_type_1.BME280_pressure = (float)comp_data.pressure;
 		packet_ma_type_1.BME280_temperature = (float)comp_data.temperature;
 		lsmread(&ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
@@ -322,13 +323,12 @@ int app_main()
 		for (int i = 0; i < 3 ; i++)
 		{
 			packet_ma_type_1.gyro_mdps[i] = (int16_t)(gyro_dps[i]*1000);
-		}*/
-		/*printf("давл %ld\n ",(int32_t)packet_ma_type_1.BME280_pressure);
+		}
+		printf("давл %ld\n ",(int32_t)packet_ma_type_1.BME280_pressure);
 		printf("темп %ld\n ",(int32_t)packet_ma_type_1.BME280_temperature);
-		printf("влажность %ld\n ",(int32_t)packet_ma_type_1.BME280_humidity);
 
 
-
+/*
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt);
 		printf("широта %ld\n ",(int32_t)lat);
@@ -396,10 +396,15 @@ int app_main()
 			//общение с ДА
 			break;
 		}*/
-		nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
-	    /*switch (nrf24_state_now)
+	    switch (nrf24_state_now)
 	    {
 	        case STATE_BUILD_PACKET_TO_GCS:
+	        	packet_ma_type_1.time = HAL_GetTick();
+	        	packet_ma_type_2.time = HAL_GetTick();
+	            packet_num_1++;
+	            packet_num_2++;
+	        	packet_ma_type_1.num = packet_num_1;
+	        	packet_ma_type_2.num = packet_num_2;
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), false);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), false);
@@ -410,7 +415,7 @@ int app_main()
 	     	    nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
 	            if(tx_status == NRF24_FIFO_EMPTY)
 	            {
-	            	nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
+	            	nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
 	            	da_1_resp_count = 0;
 	            }
 	            break;
@@ -453,9 +458,9 @@ int app_main()
 	        		else
 						nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
 	        	}
-	    }*/
+	    }
 	    dump_registers(&nrf24_api_config);
-		//nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
+		nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}
 	return 0;
     }
