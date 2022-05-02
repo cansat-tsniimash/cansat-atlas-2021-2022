@@ -208,7 +208,7 @@ void USART6_IRQHandler(void)
 	volatile uint32_t sr = USART6->SR;
 	volatile uint32_t byte = USART6->DR;
 
-	on_gps_byte(byte);
+	gps_push_byte(byte);
 	(void)sr;
   /* USER CODE END USART6_IRQn 0 */
   /* USER CODE BEGIN USART6_IRQn 1 */
