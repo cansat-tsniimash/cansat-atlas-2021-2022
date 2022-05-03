@@ -310,8 +310,6 @@ int app_main()
 	comp_data = bme_read_data(&bme);
 	float pressure_on_ground = (float)comp_data.pressure;
 
-	dump_registers(&nrf24_api_config);
-
 	while(1)
 	{
 		comp_data = bme_read_data(&bme);
@@ -340,11 +338,8 @@ int app_main()
 		packet_ma_type_1.latitude = lat;
 		packet_ma_type_1.longitude = lon;
 		packet_ma_type_1.height = (int16_t)(alt*100);
-		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
 		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
-		//printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);
-
 		/*switch (state_now)
 		{
 		case STATE_INIT:
@@ -431,7 +426,6 @@ int app_main()
 	            	nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
 	            	da_1_resp_count = 0;
 	            }
-	            HAL_Delay(1);
 	            break;
 
 	        case STATE_BUILD_PACKET_TO_DA_1 :
@@ -473,7 +467,6 @@ int app_main()
 						nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
 	        	}
 	    }
-	    dump_registers(&nrf24_api_config);
 		nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}
 	return 0;
