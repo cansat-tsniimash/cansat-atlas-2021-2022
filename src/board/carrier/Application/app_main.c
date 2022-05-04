@@ -14,6 +14,7 @@
 #include "Shift_Register/shift_reg.h"
 #include <math.h>
 #include "LSM6DS3/DLSM.h"
+#include "fatfs.h"
 
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
 #define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
@@ -304,6 +305,17 @@ int app_main()
 
 	//motor_on();
 
+	FATFS fileSystem; // переменная типа FATFS
+	FIL testFile; // хендлер файла
+	char testBuffer[16] = "TestTestTestTest"; // данные для записи
+	UINT testBytes; // количество символов, реально записанных внутрь файла
+	FRESULT res; // результат выполнения функции
+	f_mount(&fileSystem, SDPath, 1);
+	 // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
+	uint8_t path[13] = "testfile.txt"; // название файла
+	path[12] = '\0'; // добавляем символ конца строки в конец строки
+
+	res = f_open(&testFile, (char*)path, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
 
 	dump_registers(&nrf24_api_config);
 
@@ -323,10 +335,21 @@ int app_main()
 		{
 			packet_ma_type_1.gyro_mdps[i] = (int16_t)(gyro_dps[i]*1000);
 		}
-		printf("давл %ld\n ",(int32_t)packet_ma_type_1.BME280_pressure);
 		printf("темп %ld\n ",(int32_t)packet_ma_type_1.BME280_temperature);
 
 
+
+
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.BME280_pressure);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.BME280_temperature);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.DS18B20_temperature);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.acc_mg);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.flag);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.gyro_mdps);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.num);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.sum);
+		res = f_printf (&testFile, " %d;\n",(int32_t)packet_ma_type_1.time);
+		res = f_sync(&testFile); // запись в файл (на sd контроллер пишет не сразу, а по закрытии файла. Также можно использовать эту команду)
 
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt);
