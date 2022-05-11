@@ -14,11 +14,11 @@
 #include "Shift_Register/shift_reg.h"
 #include <math.h>
 #include "LSM6DS3/DLSM.h"
+#include "fatfs.h"
 
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
 #define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
 #define TIME_WAIT_BTN_PHOTOREZ 5000
-#define RADIO_TIMEOUT 500
 #define KOF 0.8
 
 extern SPI_HandleTypeDef hspi2;
@@ -60,11 +60,9 @@ typedef struct
 
 	uint8_t DS18B20_temperature;
 
-    float latitude;
-    float longitude;
-    int16_t height;
-    uint16_t cookie;
-    uint8_t fix;
+	int16_t acc_mg [3];
+
+    int16_t gyro_mdps [3];
 
 	uint16_t sum;
 
@@ -76,12 +74,14 @@ typedef struct
 	uint16_t num;
 	uint32_t time;
 
-	int16_t acc_mg [3];
+    int16_t LIS3MDL_magnetometer_x;
+    int16_t LIS3MDL_magnetometer_y;
+    int16_t LIS3MDL_magnetometer_z;
 
-    int16_t gyro_mdps [3];
-
-    int16_t LIS3MDL_magnetometer[3];
-
+    float latitude;
+    float longitude;
+    int16_t height;
+    uint8_t fix;
     float phortsistor;
 
     uint8_t state;
@@ -262,11 +262,11 @@ int app_main()
 	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
 
 	//заполнение структуры на фоторезистор
-	photorezistor_t photoresistor;
+	//photorezistor_t photoresistor;
 	//сопротивление (R)
-	photoresistor.resist = 5100;
+	//photoresistor.resist = 5100;
 	//hadc1 - дискриптор с начтройками АЦП
-	photoresistor.hadc = &hadc1;
+	//photoresistor.hadc = &hadc1;
 
 	//инициализация гпс
 	gps_init();
@@ -277,11 +277,10 @@ int app_main()
 	packet_ma_type_2_t packet_ma_type_2 = {0};
 	packet_ma_type_1.flag = 0xff;
 	packet_ma_type_2.flag = 0xfe;
-    float height;
+    uint16_t height;
 	uint32_t time_btn_now = HAL_GetTick();
 	uint8_t da_1_rx_buffer[32];
-	uint32_t state_wait_start_time = 0;
-	uint32_t send_to_gcs_start_time = 0;
+	uint32_t start_time = 0;
 	state_t state_now = STATE_INIT;
 	nrf24_state_t nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
 	nrf24_fifo_status_t rx_status;
@@ -289,7 +288,7 @@ int app_main()
 	int comp;
 	uint8_t da_1_resp_count = 0;
 	float lux_rn = 0;
-
+	float lux_sun = 0;
 	//создаем переменные для записи телеметрии gps
 	int64_t cookie;
 	float lat ;
@@ -301,45 +300,67 @@ int app_main()
     float gyro_dps [3];
     uint16_t packet_num_1 = 0;
     uint16_t packet_num_2 = 0;
-
 	nrf24_mode_standby(&nrf24_api_config);
 	nrf24_mode_tx(&nrf24_api_config);
 
 	//motor_on();
 
-	comp_data = bme_read_data(&bme);
-	float pressure_on_ground = (float)comp_data.pressure;
+	FATFS fileSystem; // переменная типа FATFS
+	FIL testFile; // хендлер файла
+	char testBuffer[16] = "TestTestTestTest"; // данные для записи
+	UINT testBytes; // количество символов, реально записанных внутрь файла
+	FRESULT res; // результат выполнения функции
+	f_mount(&fileSystem, SDPath, 1);
+	 // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
+	uint8_t path[13] = "testfile.txt"; // название файла
+	path[12] = '\0'; // добавляем символ конца строки в конец строки
+
+	res = f_open(&testFile, (char*)path, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
+
+	dump_registers(&nrf24_api_config);
 
 	while(1)
 	{
 		comp_data = bme_read_data(&bme);
 		packet_ma_type_1.BME280_pressure = (float)comp_data.pressure;
 		packet_ma_type_1.BME280_temperature = (float)comp_data.temperature;
-		height = 44330*(1 - pow((float)packet_ma_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
-
 		lsmread(&ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
 
 		for (int i= 0; i < 3 ; i++)
 		{
-			packet_ma_type_2.acc_mg[i] = (int16_t)(acc_g[i]*1000);
+			packet_ma_type_1.acc_mg[i] = (int16_t)(acc_g[i]*1000);
 		}
 
 		for (int i = 0; i < 3 ; i++)
 		{
-			packet_ma_type_2.gyro_mdps[i] = (int16_t)(gyro_dps[i]*1000);
+			packet_ma_type_1.gyro_mdps[i] = (int16_t)(gyro_dps[i]*1000);
 		}
-		printf("давл %ld\n ",(int32_t)packet_ma_type_1.BME280_pressure);
 		printf("темп %ld\n ",(int32_t)packet_ma_type_1.BME280_temperature);
 
 
 
+
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.BME280_pressure);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.BME280_temperature);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.DS18B20_temperature);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.acc_mg);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.flag);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.gyro_mdps);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.num);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.sum);
+		res = f_printf (&testFile, " %d;\n",(int32_t)packet_ma_type_1.time);
+		res = f_sync(&testFile); // запись в файл (на sd контроллер пишет не сразу, а по закрытии файла. Также можно использовать эту команду)
+
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt);
-		packet_ma_type_1.latitude = lat;
-		packet_ma_type_1.longitude = lon;
-		packet_ma_type_1.height = (int16_t)(alt*100);
+		packet_ma_type_2.latitude = lat;
+		packet_ma_type_2.longitude = lon;
+		packet_ma_type_2.height = (int16_t)(alt*100);
+		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
-		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
+		//packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
+		//printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);
+
 		/*switch (state_now)
 		{
 		case STATE_INIT:
@@ -410,19 +431,12 @@ int app_main()
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), false);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), false);
 			    nrf24_state_now = STATE_SEND_PACKET_TO_GCS;
-			    send_to_gcs_start_time = HAL_GetTick();
 			    break;
 
 	        case STATE_SEND_PACKET_TO_GCS:
 	     	    nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
 	            if(tx_status == NRF24_FIFO_EMPTY)
 	            {
-	            	nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
-	            	da_1_resp_count = 0;
-	            }
-	            if (HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
-	            {
-	            	nrf24_fifo_flush_tx(&nrf24_api_config);
 	            	nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
 	            	da_1_resp_count = 0;
 	            }
@@ -467,6 +481,7 @@ int app_main()
 						nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
 	        	}
 	    }
+	    dump_registers(&nrf24_api_config);
 		nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}
 	return 0;
