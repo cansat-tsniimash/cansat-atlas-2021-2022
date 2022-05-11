@@ -19,6 +19,7 @@
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
 #define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
 #define TIME_WAIT_BTN_PHOTOREZ 5000
+#define RADIO_TIMEOUT 2
 #define KOF 0.8
 
 extern SPI_HandleTypeDef hspi2;
@@ -31,10 +32,10 @@ typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
 {
 
     STATE_BUILD_PACKET_TO_GCS,
-
 	STATE_SEND_PACKET_TO_GCS,
 	STATE_BUILD_PACKET_TO_DA_1,
-	STATE_SEND_PACKET_TO_DA_1
+	STATE_SEND_PACKET_TO_DA_1,
+	STATE_SEND_PACKET_FROM_DA_TO_GCS
 }nrf24_state_t;
 
 typedef enum//ОПИСЫВАЕМ СОСТОЯНИЕ ПОЛЕТА
@@ -60,9 +61,11 @@ typedef struct
 
 	uint8_t DS18B20_temperature;
 
-	int16_t acc_mg [3];
-
-    int16_t gyro_mdps [3];
+    float latitude;
+    float longitude;
+    int16_t height;
+    uint16_t cookie;
+    uint8_t fix;
 
 	uint16_t sum;
 
@@ -74,14 +77,13 @@ typedef struct
 	uint16_t num;
 	uint32_t time;
 
-    int16_t LIS3MDL_magnetometer_x;
-    int16_t LIS3MDL_magnetometer_y;
-    int16_t LIS3MDL_magnetometer_z;
 
-    float latitude;
-    float longitude;
-    int16_t height;
-    uint8_t fix;
+	int16_t acc_mg [3];
+
+    int16_t gyro_mdps [3];
+
+    int16_t LIS3MDL_magnetometer[3];
+
     float phortsistor;
 
     uint8_t state;
@@ -234,12 +236,12 @@ int app_main()
 	nrf24_lower_api_config_t nrf24_api_config;
 	nrf24_spi_init_sr(&nrf24_api_config, &hspi2, &nrf24_spi_pins_sr);
 
-	nrf24_mode_power_down(&nrf24_api_config);
+	nrf24_mode_standby(&nrf24_api_config);
 	// Настройки радиопередачи
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
 	nrf24_rf_config.rf_channel = 100;
-	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_18_DBM;
 	nrf24_setup_rf(&nrf24_api_config, &nrf24_rf_config);
 
 	// Настроили протокол
@@ -262,11 +264,11 @@ int app_main()
 	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
 
 	//заполнение структуры на фоторезистор
-	//photorezistor_t photoresistor;
+	photorezistor_t photoresistor;
 	//сопротивление (R)
-	//photoresistor.resist = 5100;
+	photoresistor.resist = 5100;
 	//hadc1 - дискриптор с начтройками АЦП
-	//photoresistor.hadc = &hadc1;
+	photoresistor.hadc = &hadc1;
 
 	//инициализация гпс
 	gps_init();
@@ -300,9 +302,9 @@ int app_main()
     float gyro_dps [3];
     uint16_t packet_num_1 = 0;
     uint16_t packet_num_2 = 0;
-	nrf24_mode_standby(&nrf24_api_config);
-	nrf24_mode_tx(&nrf24_api_config);
+    nrf24_mode_tx(&nrf24_api_config);
 
+    uint32_t send_to_gcs_start_time = 0;
 	//motor_on();
 
 	FATFS fileSystem; // переменная типа FATFS
@@ -328,12 +330,12 @@ int app_main()
 
 		for (int i= 0; i < 3 ; i++)
 		{
-			packet_ma_type_1.acc_mg[i] = (int16_t)(acc_g[i]*1000);
+			packet_ma_type_2.acc_mg[i] = (int16_t)(acc_g[i]*1000);
 		}
 
 		for (int i = 0; i < 3 ; i++)
 		{
-			packet_ma_type_1.gyro_mdps[i] = (int16_t)(gyro_dps[i]*1000);
+			packet_ma_type_2.gyro_mdps[i] = (int16_t)(gyro_dps[i]*1000);
 		}
 		printf("темп %ld\n ",(int32_t)packet_ma_type_1.BME280_temperature);
 
@@ -343,9 +345,9 @@ int app_main()
 		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.BME280_pressure);
 		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.BME280_temperature);
 		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.DS18B20_temperature);
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.acc_mg);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_2.acc_mg);
 		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.flag);
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.gyro_mdps);
+		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_2.gyro_mdps);
 		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.num);
 		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.sum);
 		res = f_printf (&testFile, " %d;\n",(int32_t)packet_ma_type_1.time);
@@ -353,9 +355,9 @@ int app_main()
 
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt);
-		packet_ma_type_2.latitude = lat;
-		packet_ma_type_2.longitude = lon;
-		packet_ma_type_2.height = (int16_t)(alt*100);
+		packet_ma_type_1.latitude = lat;
+		packet_ma_type_1.longitude = lon;
+		packet_ma_type_1.height = (int16_t)(alt*100);
 		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
 		//packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
@@ -431,14 +433,21 @@ int app_main()
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), false);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), false);
 			    nrf24_state_now = STATE_SEND_PACKET_TO_GCS;
+			    send_to_gcs_start_time = HAL_GetTick();
 			    break;
 
 	        case STATE_SEND_PACKET_TO_GCS:
 	     	    nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
 	            if(tx_status == NRF24_FIFO_EMPTY)
 	            {
-	            	nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
+	            	nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
 	            	da_1_resp_count = 0;
+	            }
+	            if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
+	            {
+	            	nrf24_fifo_flush_tx(&nrf24_api_config);
+	            	nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
+	                da_1_resp_count = 0;
 	            }
 	            break;
 
@@ -447,41 +456,75 @@ int app_main()
 	        	//printf("ДА, лови маслину\n");
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), true);
+			    HAL_Delay(50);
 			    nrf24_state_now = STATE_SEND_PACKET_TO_DA_1;
+			    send_to_gcs_start_time = HAL_GetTick();
 
 	        case STATE_SEND_PACKET_TO_DA_1:
-	        	nrf24_irq_get(&nrf24_api_config, &comp);
-
-	        	if (comp & NRF24_IRQ_TX_DR)
+	        	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == GPIO_PIN_RESET)
 	        	{
-	        		size_t packet_size = nrf24_fifo_read(&nrf24_api_config, da_1_rx_buffer, sizeof(da_1_rx_buffer));
-	        		if (packet_size > 0)
+		        	nrf24_irq_get(&nrf24_api_config, &comp);
+
+					if (comp & NRF24_IRQ_TX_DR)
+					{
+						size_t packet_size = nrf24_fifo_read(&nrf24_api_config, da_1_rx_buffer, sizeof(da_1_rx_buffer));
+						if (packet_size > 0)
+						{
+							nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
+							nrf24_irq_get(&nrf24_api_config, &comp);
+							nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
+			            	nrf24_fifo_flush_tx(&nrf24_api_config);
+							nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
+							nrf24_fifo_write(&nrf24_api_config, (uint8_t *)da_1_rx_buffer, packet_size, false);
+
+							HAL_Delay(50);
+							send_to_gcs_start_time = HAL_GetTick();
+							nrf24_state_now = STATE_SEND_PACKET_FROM_DA_TO_GCS;
+							break;
+							printf("\n");
+						}
+					}
+					else if (comp & NRF24_IRQ_MAX_RT)
+					{
+						//printf("!!!ОШИБКА!!!\n");
+						if (da_1_resp_count > 2)
+							nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
+						else
+							nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
+					}
+	        	}
+				if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
+				{
+					nrf24_fifo_flush_tx(&nrf24_api_config);
+					if (da_1_resp_count >= 2)
+						nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
+					else
+						nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
+				}
+	        	break;
+	        case STATE_SEND_PACKET_FROM_DA_TO_GCS:
+	        	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == GPIO_PIN_RESET)
+	        	{
+	        		nrf24_irq_get(&nrf24_api_config, &comp);
+	        		if (comp & (NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT))
 	        		{
-	        			for(int i =0 ; i < packet_size ; i++)
-	        			{
-	        				printf("%i ", da_1_rx_buffer[i]);
-	        			}
-	        			printf("\n");
+		        		if (da_1_resp_count >= 2)
+		        			nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
+		        		else
+							nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
 	        		}
-	        		else
-	        		{
-        				printf("пакета нету, гуляй\n");
-	        		}
+	        	}
+				if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
+				{
+					nrf24_fifo_flush_tx(&nrf24_api_config);
 	        		if (da_1_resp_count >= 2)
 	        			nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
 	        		else
 						nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
-	        	}
-	        	if (comp & NRF24_IRQ_MAX_RT)
-	        	{
-	        		//printf("!!!ОШИБКА!!!\n");
-	        		if (da_1_resp_count > 2)
-	        			nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
-	        		else
-						nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
-	        	}
+				}
+				break;
 	    }
-	    dump_registers(&nrf24_api_config);
+	    //dump_registers(&nrf24_api_config);
 		nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}
 	return 0;
