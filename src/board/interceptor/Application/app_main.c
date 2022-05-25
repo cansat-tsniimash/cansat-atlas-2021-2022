@@ -26,13 +26,16 @@ typedef struct
 	uint32_t time;
 
 	uint32_t BME280_pressure;
-	int16_t BME280_temperature;
+	uint8_t BME280_temperature;
 	uint16_t BME280_humidity;
 
-	int16_t LSM6DSL_accelerometer[3];
+	int16_t LSM6DSL_accelerometer_x;
+	int16_t LSM6DSL_accelerometer_y;
+	int16_t LSM6DSL_accelerometer_z;
 
-	int16_t LSM6DSL_gyroscope[3];
-
+	int16_t LSM6DSL_gyroscope_x;
+	int16_t LSM6DSL_gyroscope_y;
+	int16_t LSM6DSL_gyroscope_z;
 
 	uint16_t sum;
 
@@ -107,7 +110,7 @@ int app_main()
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
 	nrf24_rf_config.rf_channel = 100;
-	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_18_DBM;
 	nrf24_setup_rf(&nrf24_lower_api_config, &nrf24_rf_config);
 
 	// Настроили протокол
@@ -164,15 +167,6 @@ int app_main()
 		printf("влажность %ld\n ",(int32_t)packet_da_type_1.BME280_humidity);
 
 		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
-		for(int i = 0; i < 3; i++)
-		{
-			packet_da_type_1.LSM6DSL_accelerometer[i] = (int16_t)(acc_g[i]*1000);
-		}
-
-		for(int i = 0; i < 3; i++)
-		{
-			packet_da_type_1.LSM6DSL_gyroscope[i] = (int16_t)(gyro_dps[i]*1000);
-		}
 
 		gps_work();
 		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height);
@@ -187,14 +181,8 @@ int app_main()
 
         if (tx_status != NRF24_FIFO_EMPTY)
         {
-    	    nrf24_fifo_flush_tx(&nrf24_lower_api_config);
+    	    //nrf24_fifo_flush_tx(&nrf24_api_config);
         }
-        packet_num_1++;
-        packet_da_type_1.num = packet_num_1;
-        packet_num_2++;
-        packet_da_type_2.num = packet_num_2;
-        packet_da_type_1.time = HAL_GetTick();
-        packet_da_type_2.time = HAL_GetTick();
         nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
         nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
 

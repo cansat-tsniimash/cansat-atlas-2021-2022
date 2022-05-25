@@ -15,6 +15,8 @@
 #include <math.h>
 #include "LSM6DS3/DLSM.h"
 #include "fatfs.h"
+#include "LIS3MDL/DLIS3.h"
+#include "1Wire_DS18B20/one_wire.h"
 
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
 #define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
@@ -59,7 +61,7 @@ typedef struct
 	float BME280_pressure;
 	float BME280_temperature;
 
-	uint8_t DS18B20_temperature;
+	int16_t DS18B20_temperature;
 
     float latitude;
     float longitude;
@@ -197,6 +199,11 @@ static void dump_registers(void *intf_ptr)
 
 int app_main()
 {
+	ds18b20_t ds18b20;
+	ds18b20.onewire_pin = GPIO_PIN_1;
+	ds18b20.onewire_port = GPIOA;
+    onewire_init(&ds18b20);
+
 	shift_reg_t shift_reg_sens;
 	shift_reg_sens.bus = &hspi2;
 	shift_reg_sens.latch_port = GPIOC;
@@ -229,6 +236,12 @@ int app_main()
 	spi_intf.sr_pin = 2;
 	bme_init_default_sr(&bme, &spi_intf);
 
+	stmdev_ctx_t lis3mdl_ctx;
+	struct lis_spi_intf_sr lis_interface;
+	lis_interface.spi = &hspi2;
+	lis_interface.sr = &shift_reg_sens;
+	lis_interface.sr_pin = 3;
+
 	nrf24_spi_pins_sr_t nrf24_spi_pins_sr;
 	nrf24_spi_pins_sr.pos_CE = 0;
 	nrf24_spi_pins_sr.pos_CS = 1;
@@ -254,6 +267,8 @@ int app_main()
 	nrf24_protocol_config.en_dyn_ack = true;
 	nrf24_protocol_config.en_dyn_payload_size = true;
 	nrf24_setup_protocol(&nrf24_api_config, &nrf24_protocol_config);
+
+	float temperature_celsius_mag;
 
 	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xacacacacac);
 
@@ -303,9 +318,18 @@ int app_main()
     uint16_t packet_num_1 = 0;
     uint16_t packet_num_2 = 0;
     nrf24_mode_tx(&nrf24_api_config);
+    float mag[3];
+    uint32_t start_time_ds = 0;
+    uint32_t now_time_ds = 0;
+    uint16_t temp_ds18b20;
+    bool crc_ok_ds;
+    int fix;
+    UINT bw;
 
     uint32_t send_to_gcs_start_time = 0;
 	//motor_on();
+
+    lisset_sr(&lis3mdl_ctx, &lis_interface);
 
 	FATFS fileSystem; // переменная типа FATFS
 	FIL testFile; // хендлер файла
@@ -321,6 +345,8 @@ int app_main()
 
 	dump_registers(&nrf24_api_config);
 
+	start_time_ds = HAL_GetTick();
+	ds18b20_start_conversion(&ds18b20);
 	while(1)
 	{
 		comp_data = bme_read_data(&bme);
@@ -340,24 +366,33 @@ int app_main()
 		printf("темп %ld\n ",(int32_t)packet_ma_type_1.BME280_temperature);
 
 
+		lisread(&lis3mdl_ctx,&temperature_celsius_mag, &mag);
+		for (int i = 0; i < 3 ;i++)
+		{
+			packet_ma_type_2.LIS3MDL_magnetometer[i] = mag[i]*1000;
+		}
 
 
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.BME280_pressure);
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.BME280_temperature);
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.DS18B20_temperature);
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_2.acc_mg);
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.flag);
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_2.gyro_mdps);
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.num);
-		res = f_printf (&testFile, " %d;",(int32_t)packet_ma_type_1.sum);
-		res = f_printf (&testFile, " %d;\n",(int32_t)packet_ma_type_1.time);
-		res = f_sync(&testFile); // запись в файл (на sd контроллер пишет не сразу, а по закрытии файла. Также можно использовать эту команду)
+
+		now_time_ds = HAL_GetTick();
+		if (HAL_GetTick()-start_time_ds >= 750)
+		{
+			ds18b20_read_raw_temperature(&ds18b20, &temp_ds18b20, &crc_ok_ds);
+			packet_ma_type_1.DS18B20_temperature = (temp_ds18b20*10)/16;
+			ds18b20_start_conversion(&ds18b20);
+			start_time_ds = HAL_GetTick();
+		}
+
+
+
+
 
 		gps_work();
-		gps_get_coords(&cookie,  & lat,  & lon,& alt);
+		gps_get_coords(&cookie,  & lat,  & lon,& alt, &fix);
 		packet_ma_type_1.latitude = lat;
 		packet_ma_type_1.longitude = lon;
 		packet_ma_type_1.height = (int16_t)(alt*100);
+		packet_ma_type_1.fix = fix;
 		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
 		//packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
@@ -434,6 +469,9 @@ int app_main()
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), false);
 			    nrf24_state_now = STATE_SEND_PACKET_TO_GCS;
 			    send_to_gcs_start_time = HAL_GetTick();
+				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), &bw);
+				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
+		        // запись в файл (на sd контроллер пишет не сразу, а по закрытии файла. Также можно использовать эту команду)
 			    break;
 
 	        case STATE_SEND_PACKET_TO_GCS:
@@ -480,6 +518,7 @@ int app_main()
 							HAL_Delay(50);
 							send_to_gcs_start_time = HAL_GetTick();
 							nrf24_state_now = STATE_SEND_PACKET_FROM_DA_TO_GCS;
+							res = f_write (&testFile, (uint8_t *)da_1_rx_buffer, packet_size, &bw);
 							break;
 							printf("\n");
 						}
