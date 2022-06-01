@@ -197,6 +197,19 @@ static void dump_registers(void *intf_ptr)
 
 
 
+unsigned short Crc16(unsigned char *buf, unsigned short len) {
+	unsigned short crc = 0xFFFF;
+	unsigned char i;
+	while (len--) {
+		crc ^= *buf++ << 8;
+		for (i = 0; i < 8; i++)
+			crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
+	}
+	return crc;
+}
+
+
+
 int app_main()
 {
 	ds18b20_t ds18b20;
@@ -338,7 +351,7 @@ int app_main()
 	FRESULT res; // результат выполнения функции
 	f_mount(&fileSystem, SDPath, 1);
 	 // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
-	uint8_t path[13] = "testfile.txt"; // название файла
+	uint8_t path[13] = "testfile.bin"; // название файла
 	path[12] = '\0'; // добавляем символ конца строки в конец строки
 
 	res = f_open(&testFile, (char*)path, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
@@ -464,6 +477,8 @@ int app_main()
 	            packet_num_2++;
 	        	packet_ma_type_1.num = packet_num_1;
 	        	packet_ma_type_2.num = packet_num_2;
+	        	packet_ma_type_1.sum = Crc16((uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1) - 2);
+	        	packet_ma_type_2.sum = Crc16((uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2) - 2);
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), false);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), false);
@@ -471,6 +486,7 @@ int app_main()
 			    send_to_gcs_start_time = HAL_GetTick();
 				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), &bw);
 				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
+				f_sync(&testFile);
 		        // запись в файл (на sd контроллер пишет не сразу, а по закрытии файла. Также можно использовать эту команду)
 			    break;
 
@@ -519,6 +535,7 @@ int app_main()
 							send_to_gcs_start_time = HAL_GetTick();
 							nrf24_state_now = STATE_SEND_PACKET_FROM_DA_TO_GCS;
 							res = f_write (&testFile, (uint8_t *)da_1_rx_buffer, packet_size, &bw);
+							f_sync(&testFile);
 							break;
 							printf("\n");
 						}
