@@ -15,7 +15,7 @@
   *
   ******************************************************************************
   */
-
+#define HAL_FATFS_ENABLED
 /* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/

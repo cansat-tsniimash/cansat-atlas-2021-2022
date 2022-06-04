@@ -11,6 +11,7 @@
 #include <math.h>
 #include "BME280/DriverForBME280.h"
 #include "../stm32f1/LSM6DS3/DLSM.h"
+#include "fatfs.h"
 
 extern UART_HandleTypeDef huart3;
 
@@ -63,9 +64,21 @@ typedef struct
 
 int app_main()
 {
+	FATFS fileSystem; // переменная типа FATFS
+	FIL testFile; // хендлер файла
+	UINT testBytes; // количество символов, реально записанных внутрь файла
+	FRESULT res; // результат выполнения функции
+
+	if(f_mount(&fileSystem, "", 1) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
+		uint8_t path[13] = "testfile_da.txt"; // название файла
+		path[12] = '\0'; // добавляем символ конца строки в конец строки
+		res = f_open(&testFile, (char*)path, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
+	}
+
 	//берем изначальное давление для барометрической формулы
 	uint32_t pressure_on_ground;
 
+    UINT bw;
 	float height_BME280 = 0;
 	struct bme280_dev bme = {0};	//инициализируем настройки бме280
 	struct bme_spi_intf bme280_buffer;
@@ -165,6 +178,13 @@ int app_main()
 		printf("давл %ld\n ",(int32_t)packet_da_type_1.BME280_pressure);
 		printf("темп %ld\n ",(int32_t)packet_da_type_1.BME280_temperature);
 		printf("влажность %ld\n ",(int32_t)packet_da_type_1.BME280_humidity);
+
+		if(f_mount(&fileSystem, "", 1) == FR_OK)
+		{
+			res = f_write (&testFile,  (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &bw);
+			res = f_write (&testFile,  (uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2), &bw);
+			f_sync(&testFile);
+		}
 
 		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
 

@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -97,6 +98,7 @@ int main(void)
   MX_SPI2_Init();
   MX_USART3_UART_Init();
   MX_USART1_UART_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
   app_main();
   /* USER CODE END 2 */
