@@ -115,7 +115,7 @@ int app_main()
 
 	nrf24_lower_api_config_t nrf24_lower_api_config;
 
-	nrf24_spi_init(&nrf24_lower_api_config, &hspi2, &nrf24_spi_pins);
+	nrf24_spi_init(&nrf24_lower_api_config, &hspi1, &nrf24_spi_pins);
 
 	nrf24_mode_power_down(&nrf24_lower_api_config);
 
@@ -166,7 +166,8 @@ int app_main()
 	float height_on_BME280 = 0;
 	while(true)
 	{
-
+		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
+		HAL_Delay(100);
 		comp_data = bme_read_data(&bme);
 		packet_da_type_1.BME280_pressure = (uint32_t)comp_data.pressure;
 		packet_da_type_1.BME280_temperature = (int16_t)(comp_data.temperature*100);
@@ -201,7 +202,7 @@ int app_main()
 
         if (tx_status != NRF24_FIFO_EMPTY)
         {
-    	    //nrf24_fifo_flush_tx(&nrf24_api_config);
+    	    nrf24_fifo_flush_tx(&nrf24_lower_api_config);
         }
         nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
         nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
