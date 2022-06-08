@@ -64,16 +64,18 @@ typedef struct
 
 int app_main()
 {
+    uint8_t state_sd = 88;
+
 	FATFS fileSystem; // переменная типа FATFS
 	FIL testFile; // хендлер файла
 	UINT testBytes; // количество символов, реально записанных внутрь файла
 	FRESULT res; // результат выполнения функции
 
-	if(f_mount(&fileSystem, "", 1) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
-		uint8_t path[13] = "testfile_da.txt"; // название файла
-		path[12] = '\0'; // добавляем символ конца строки в конец строки
-		res = f_open(&testFile, (char*)path, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
+	if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
+		const char * path = "testfile_da2.txt"; // название файла
+		res = f_open(&testFile, path,  FA_OPEN_ALWAYS | FA_READ | FA_WRITE); // открытие файла, обязательно для работы с ним
 	}
+	printf("open res %d\n", (int)res);
 
 	//берем изначальное давление для барометрической формулы
 	uint32_t pressure_on_ground;
@@ -179,7 +181,7 @@ int app_main()
 		printf("темп %ld\n ",(int32_t)packet_da_type_1.BME280_temperature);
 		printf("влажность %ld\n ",(int32_t)packet_da_type_1.BME280_humidity);
 
-		if(f_mount(&fileSystem, "", 1) == FR_OK)
+		if(state_sd == FR_OK)
 		{
 			res = f_write (&testFile,  (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &bw);
 			res = f_write (&testFile,  (uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2), &bw);
