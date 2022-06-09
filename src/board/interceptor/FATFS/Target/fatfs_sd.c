@@ -161,7 +161,7 @@ static bool SD_RxDataBlock(BYTE *buff, UINT len)
 	/* receive data */
 	do {
 		SPI_RxBytePtr(buff++);
-	} while(len--);
+	} while(--len);
 
 	/* discard CRC */
 	SPI_RxByte();
