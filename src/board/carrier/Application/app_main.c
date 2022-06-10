@@ -273,7 +273,7 @@ int app_main()
 	// Настроили протокол
 	nrf24_protocol_config_t nrf24_protocol_config;
 	nrf24_protocol_config.address_width = NRF24_ADDRES_WIDTH_5_BYTES;
-	nrf24_protocol_config.auto_retransmit_count = 15;
+	nrf24_protocol_config.auto_retransmit_count = 1;
 	nrf24_protocol_config.auto_retransmit_delay = 15;
 	nrf24_protocol_config.crc_size = NRF24_CRCSIZE_1BYTE;
 	nrf24_protocol_config.en_ack_payload = true;
@@ -360,6 +360,8 @@ int app_main()
 
 	start_time_ds = HAL_GetTick();
 	ds18b20_start_conversion(&ds18b20);
+
+	uint8_t da_msg[] = "Artem";
 	while(1)
 	{
 		comp_data = bme_read_data(&bme);
@@ -509,7 +511,7 @@ int app_main()
 	        	da_1_resp_count++;
 	        	//printf("ДА, лови маслину\n");
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
-			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), true);
+			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&da_msg, sizeof(da_msg), true);
 			    HAL_Delay(50);
 			    nrf24_state_now = STATE_SEND_PACKET_TO_DA_1;
 			    send_to_gcs_start_time = HAL_GetTick();
@@ -519,7 +521,7 @@ int app_main()
 	        	{
 		        	nrf24_irq_get(&nrf24_api_config, &comp);
 
-					if (comp & NRF24_IRQ_TX_DR)
+					if (comp & NRF24_IRQ_TX_DR || (comp & NRF24_IRQ_MAX_RT))
 					{
 						size_t packet_size = nrf24_fifo_read(&nrf24_api_config, da_1_rx_buffer, sizeof(da_1_rx_buffer));
 						if (packet_size > 0)

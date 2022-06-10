@@ -313,7 +313,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOB, BUZZER_Pin|CS_SD_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CE_NRF24L01_GPIO_Port, CE_NRF24L01_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(CE_NRF24L01_GPIO_Port, CE_NRF24L01_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(CE_NRF24L01A10_GPIO_Port, CE_NRF24L01A10_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
@@ -355,8 +358,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = CE_NRF24L01_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(CE_NRF24L01_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : CE_NRF24L01A10_Pin */
+  GPIO_InitStruct.Pin = CE_NRF24L01A10_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(CE_NRF24L01A10_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB5 */
   GPIO_InitStruct.Pin = GPIO_PIN_5;

@@ -69,11 +69,11 @@ int app_main()
 	UINT testBytes; // количество символов, реально записанных внутрь файла
 	FRESULT res; // результат выполнения функции
 
-	if(f_mount(&fileSystem, "", 1) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
-		uint8_t path[13] = "testfile_da.txt"; // название файла
-		path[12] = '\0'; // добавляем символ конца строки в конец строки
-		res = f_open(&testFile, (char*)path, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
-	}
+	//if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
+	//	const char * path = "testfile_da2.txt"; // название файла
+	//	res = f_open(&testFile, path,  FA_OPEN_ALWAYS | FA_READ | FA_WRITE); // открытие файла, обязательно для работы с ним
+	//}
+	printf("open res %d\n", (int)res);
 
 	//берем изначальное давление для барометрической формулы
 	uint32_t pressure_on_ground;
@@ -109,7 +109,7 @@ int app_main()
 
 	nrf24_spi_pins_t nrf24_spi_pins;
 	nrf24_spi_pins.ce_port = GPIOA;
-	nrf24_spi_pins.ce_pin = GPIO_PIN_10;
+	nrf24_spi_pins.ce_pin = GPIO_PIN_8;
 	nrf24_spi_pins.cs_pin = GPIO_PIN_15;
 	nrf24_spi_pins.cs_port = GPIOC;
 
@@ -118,12 +118,13 @@ int app_main()
 	nrf24_spi_init(&nrf24_lower_api_config, &hspi1, &nrf24_spi_pins);
 
 	nrf24_mode_power_down(&nrf24_lower_api_config);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
 
 	// Настройки радиопередачи
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
 	nrf24_rf_config.rf_channel = 100;
-	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_18_DBM;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_6_DBM;
 	nrf24_setup_rf(&nrf24_lower_api_config, &nrf24_rf_config);
 
 	// Настроили протокол
@@ -144,9 +145,11 @@ int app_main()
 	pipe_config.payload_size = -1;
 	nrf24_pipe_rx_start(&nrf24_lower_api_config, 0, &pipe_config);
 
+	nrf24_pipe_set_tx_addr(&nrf24_lower_api_config, 0xafafafaf01);
+
 	nrf24_mode_standby(&nrf24_lower_api_config);
 
-	uint8_t rx_buffer[32];
+	uint8_t rx_buffer[32] = {0};
 
 	nrf24_fifo_status_t rx_status = 0;
     nrf24_fifo_status_t tx_status = 0;
@@ -162,7 +165,6 @@ int app_main()
     float gyro_dps [3];
     uint16_t packet_num_1 = 0;
     uint16_t packet_num_2 = 0;
-
 	float height_on_BME280 = 0;
 	while(true)
 	{
@@ -180,32 +182,43 @@ int app_main()
 		printf("темп %ld\n ",(int32_t)packet_da_type_1.BME280_temperature);
 		printf("влажность %ld\n ",(int32_t)packet_da_type_1.BME280_humidity);
 
-		if(f_mount(&fileSystem, "", 1) == FR_OK)
-		{
-			res = f_write (&testFile,  (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &bw);
-			res = f_write (&testFile,  (uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2), &bw);
-			f_sync(&testFile);
-		}
+		//if(state_sd == FR_OK)
+		//{
+		//	res = f_write (&testFile,  (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &bw);
+		//	res = f_write (&testFile,  (uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2), &bw);
+		//	f_sync(&testFile);
+		//}
 
 		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
 
 		gps_work();
-		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height);
+		//gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height);
 
 
 		nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
+		//HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
 
 		if (rx_status != NRF24_FIFO_EMPTY)
 		{
+			uint8_t rx_packet_size = 255;
+			uint8_t rx_pipe_no = 255;
+			bool tx_full = false;
+			nrf24_fifo_peek(&nrf24_lower_api_config,  &rx_packet_size, &rx_pipe_no, &tx_full);
 			nrf24_fifo_read(&nrf24_lower_api_config, rx_buffer, 32);
+			nrf24_fifo_flush_rx(&nrf24_lower_api_config);
+			nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
 		}
 
-        if (tx_status != NRF24_FIFO_EMPTY)
+        if (tx_status == NRF24_FIFO_EMPTY)
         {
     	    nrf24_fifo_flush_tx(&nrf24_lower_api_config);
+    	    nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
+    	    nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
+    	    nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
+    	    nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
+    	    nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
         }
-        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
-        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
 
         //опускаем флаги
         nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
