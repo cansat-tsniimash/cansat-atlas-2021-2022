@@ -21,7 +21,7 @@
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
 #define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
 #define TIME_WAIT_BTN_PHOTOREZ 5000
-#define RADIO_TIMEOUT 2
+#define RADIO_TIMEOUT 2000
 #define KOF 0.8
 #define HEIGHT_SEPARATION 200
 
@@ -523,10 +523,26 @@ int app_main()
 				break;
 
 	        case STATE_SEND:
-	     	    nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
-	            if(tx_status == NRF24_FIFO_EMPTY)
-	            {
-	            	nrf24_state_now = state_in_send_true;
+	        	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == GPIO_PIN_RESET)
+	        	{
+	        		nrf24_irq_get(&nrf24_api_config, &comp);
+	        		nrf24_irq_clear(&nrf24_api_config, comp);
+	        		if (comp & NRF24_IRQ_TX_DR)
+					{
+						nrf24_state_now = state_in_send_true;
+						break;
+					}
+	        		else if (comp & NRF24_IRQ_MAX_RT)
+					{
+		            	nrf24_fifo_flush_tx(&nrf24_api_config);
+		            	nrf24_state_now = state_in_send_false;
+		            	break;
+					}
+	        		else
+	        		{
+		            	nrf24_fifo_flush_tx(&nrf24_api_config);
+	        			nrf24_state_now = state_in_send_false;
+	        		}
 	            }
 	            if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
 	            {
@@ -575,7 +591,7 @@ int app_main()
 
 	    }
 	    //dump_registers(&nrf24_api_config);
-		nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
+		//nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}
 	return 0;
     }
