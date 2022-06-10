@@ -30,13 +30,9 @@ typedef struct
 	uint8_t BME280_temperature;
 	uint16_t BME280_humidity;
 
-	int16_t LSM6DSL_accelerometer_x;
-	int16_t LSM6DSL_accelerometer_y;
-	int16_t LSM6DSL_accelerometer_z;
+	int16_t LSM6DSL_accelerometer[3];
 
-	int16_t LSM6DSL_gyroscope_x;
-	int16_t LSM6DSL_gyroscope_y;
-	int16_t LSM6DSL_gyroscope_z;
+	int16_t LSM6DSL_gyroscope[3];
 
 	uint16_t sum;
 
@@ -60,10 +56,20 @@ typedef struct
 }packet_da_type_2_t;
 #pragma pack(pop)
 
-
+unsigned short Crc16(unsigned char *buf, unsigned short len) {
+	unsigned short crc = 0xFFFF;
+	unsigned char i;
+	while (len--) {
+		crc ^= *buf++ << 8;
+		for (i = 0; i < 8; i++)
+			crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
+	}
+	return crc;
+}
 
 int app_main()
 {
+	uint32_t time;
     uint8_t state_sd = 88;
 
     bool radio_flag = true;
@@ -73,8 +79,8 @@ int app_main()
 	FRESULT res; // результат выполнения функции
 
 	if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
-		const char * path = "testfile_da2.txt"; // название файла
-		res = f_open(&testFile, path,  FA_OPEN_ALWAYS | FA_READ | FA_WRITE); // открытие файла, обязательно для работы с ним
+		const char * path = "testfile_da2.bin"; // название файла
+		res = f_open(&testFile, path,  FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
 	}
 	printf("open res %d\n", (int)res);
 
@@ -146,6 +152,7 @@ int app_main()
 	pipe_config.enable_auto_ack = true;
 	pipe_config.payload_size = -1;
 	nrf24_pipe_rx_start(&nrf24_lower_api_config, 0, &pipe_config);
+	uint16_t num = 0;
 
 	nrf24_mode_standby(&nrf24_lower_api_config);
 
@@ -171,11 +178,19 @@ int app_main()
 	float height_on_BME280 = 0;
 	while(true)
 	{
+		time = HAL_GetTick();
+
+		packet_da_type_1.time = HAL_GetTick();
+		packet_da_type_2.time = HAL_GetTick();
 
 		comp_data = bme_read_data(&bme);
 		packet_da_type_1.BME280_pressure = (uint32_t)comp_data.pressure;
+		packet_da_type_1.num = num;
+		packet_da_type_2.num = num;
 		packet_da_type_1.BME280_temperature = (int16_t)(comp_data.temperature*100);
 		packet_da_type_1.BME280_humidity = (uint16_t)comp_data.humidity;
+
+		num++;
 
 		height_on_BME280 = 44330*(1 - pow((float)packet_da_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
 
@@ -191,7 +206,7 @@ int app_main()
 			f_sync(&testFile);
 		}
 
-		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
+		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &packet_da_type_1.LSM6DSL_accelerometer, &packet_da_type_1.LSM6DSL_gyroscope);
 
 		gps_work();
 		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height);
@@ -199,26 +214,28 @@ int app_main()
 
 		nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
 
+		packet_da_type_1.sum = Crc16((uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1) - 2);
+		packet_da_type_2.sum = Crc16((uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2) - 2);
 
 		if (rx_status != NRF24_FIFO_EMPTY)
 		   {
 			nrf24_fifo_read(&nrf24_lower_api_config, rx_buffer, 32);
-			nrf24_fifo_flush_rx(&nrf24_api_config);
-		}
+			nrf24_fifo_flush_rx(&nrf24_lower_api_config);
+		   }
 
 		if (rx_status != NRF24_FIFO_NOT_EMPTY || HAL_GetTick() - time_nrf_start >= 1000)
 		{
 			time_nrf_start = HAL_GetTick();
         if (radio_flag)
         {
-        	nrf24_fifo_flush_tx(&nrf24_api_config);
+        	nrf24_fifo_flush_tx(&nrf24_lower_api_config);
             nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
             nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
             radio_flag = !radio_flag;
         }
         else
         {
-        	nrf24_fifo_flush_tx(&nrf24_api_config);
+        	nrf24_fifo_flush_tx(&nrf24_lower_api_config);
  	        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
  	        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
             radio_flag = !radio_flag;
