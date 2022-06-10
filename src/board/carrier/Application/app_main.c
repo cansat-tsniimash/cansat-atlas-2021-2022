@@ -23,6 +23,7 @@
 #define TIME_WAIT_BTN_PHOTOREZ 5000
 #define RADIO_TIMEOUT 2
 #define KOF 0.8
+#define HEIGHT_SEPARATION 200
 
 extern SPI_HandleTypeDef hspi2;
 extern ADC_HandleTypeDef hadc1;
@@ -405,18 +406,22 @@ int app_main()
 
 
 
+		uint16_t height_on_BME280;
+		uint32_t pressure_on_ground;
+		pressure_on_ground = (float)comp_data.pressure;
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt, &fix);
 		packet_ma_type_1.latitude = lat;
 		packet_ma_type_1.longitude = lon;
 		packet_ma_type_1.height = (int16_t)(alt*100);
+		height_on_BME280 = 44330*(1 - pow((float)packet_ma_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
 		packet_ma_type_1.fix = fix;
 		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
 		//packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
 		//printf("%ld\n", (uint32_t)packet_ma_type_2.phortsistor);
 
-		/*switch (state_now)
+		switch (state_now)
 		{
 		case STATE_INIT:
 			if (check_out_board_trigger() == false)
@@ -429,6 +434,7 @@ int app_main()
 		case STATE_ON_GROUND:
 			if (check_out_board_trigger() == true)
 			{
+
 				state_now = STATE_WAIT;
 			}
 
@@ -454,8 +460,10 @@ int app_main()
 			break;
 
 		case STATE_AFTER_SEPARATION:
-			//ждем достижения восыты
-			state_now = STATE_MINOR_DEVICE_SEPARATION;
+			if (HEIGHT_SEPARATION >= height_on_BME280)
+			{
+				state_now = STATE_MINOR_DEVICE_SEPARATION;
+			}
 			break;
 
 		case STATE_MINOR_DEVICE_SEPARATION:
@@ -470,9 +478,15 @@ int app_main()
 			break;
 
 		case STATE_SEPARATED:
-			//общение с ДА
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
 			break;
-		}*/
+		}
+
+
+
+
+
+
 	    switch (nrf24_state_now)
 	    {
 
