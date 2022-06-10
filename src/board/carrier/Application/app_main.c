@@ -37,7 +37,9 @@ typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
 	STATE_BUILD_PACKET_MA_2_TO_GCS,
 	STATE_BUILD_PACKET_TO_DA_1,
 	STATE_SEND,
-	STATE_WRITE_DA_PACKET_TO_GCS
+	STATE_WRITE_DA_PACKET_TO_GCS,
+	STATE_SEND_PACKET_FROM_DA_TO_GCS,
+	STATE_BUILD_PACKET_TO_DA_2
 }nrf24_state_t;
 
 typedef enum//ОПИСЫВАЕМ СОСТОЯНИЕ ПОЛЕТА
@@ -312,7 +314,7 @@ int app_main()
 	uint8_t da_1_rx_buffer[32];
 	uint32_t start_time = 0;
 	state_t state_now = STATE_INIT;
-	nrf24_state_t nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
+	nrf24_state_t nrf24_state_now = STATE_BUILD_PACKET_MA_1_TO_GCS;
 	nrf24_fifo_status_t rx_status;
 	nrf24_fifo_status_t tx_status;
 	int comp;
@@ -476,7 +478,6 @@ int app_main()
 
 	        case STATE_BUILD_PACKET_MA_1_TO_GCS:
 	        	packet_ma_type_1.time = HAL_GetTick();
-
 	            packet_num_1++;
 	        	packet_ma_type_1.num = packet_num_1;
 	        	packet_ma_type_1.sum = Crc16((uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1) - 2);
@@ -499,13 +500,14 @@ int app_main()
 	        	packet_ma_type_2.num = packet_num_2;
 	        	packet_ma_type_2.sum = Crc16((uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2) - 2);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), false);
-                state_in_send_true = STATE_BUILD_PACKET_DA_1;
-                state_in_send_false = STATE_BUILD_PACKET_DA_1;
+                state_in_send_true = STATE_BUILD_PACKET_TO_DA_1;
+                state_in_send_false = STATE_BUILD_PACKET_TO_DA_1;
 			    nrf24_state_now = STATE_SEND;
 			    send_to_gcs_start_time = HAL_GetTick();
 				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
 				f_sync(&testFile);
 				break;
+
 	        case STATE_SEND:
 	     	    nrf24_fifo_status(&nrf24_api_config, &rx_status, &tx_status);
 	            if(tx_status == NRF24_FIFO_EMPTY)
@@ -518,6 +520,7 @@ int app_main()
 	            	nrf24_state_now = state_in_send_false;
 	            }
 	            break;
+
 	        case STATE_BUILD_PACKET_TO_DA_1 :
 	        	//printf("ДА, лови маслину\n");
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
@@ -527,6 +530,7 @@ int app_main()
 			    nrf24_state_now = STATE_SEND;
 			    send_to_gcs_start_time = HAL_GetTick();
 	        	break;
+
 	        case STATE_WRITE_DA_PACKET_TO_GCS :
 	        	packet_size = nrf24_fifo_read(&nrf24_api_config, da_1_rx_buffer, sizeof(da_1_rx_buffer));
 	        	if (packet_size > 0)
@@ -539,35 +543,22 @@ int app_main()
 					send_to_gcs_start_time = HAL_GetTick();
 					state_in_send_true = state_in_send_false;
 					nrf24_state_now = STATE_SEND;
-
 				}
 	        	else
 	        	{
 	        		nrf24_state_now = state_in_send_false;
 	        	}
 				break;
-	        case STATE_SEND_PACKET_FROM_DA_TO_GCS:
-	        	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == GPIO_PIN_RESET)
-	        	{
-	        		nrf24_irq_get(&nrf24_api_config, &comp);
-	        		nrf24_irq_clear(&nrf24_api_config, &comp);
-	        		if (comp & (NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT))
-	        		{
-		        		if (da_1_resp_count >= 2)
-		        			nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
-		        		else
-							nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
-	        		}
-	        	}
-				if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
-				{
-					nrf24_fifo_flush_tx(&nrf24_api_config);
-	        		if (da_1_resp_count >= 2)
-	        			nrf24_state_now = STATE_BUILD_PACKET_TO_GCS;
-	        		else
-						nrf24_state_now = STATE_BUILD_PACKET_TO_DA_1;
-				}
-				break;
+
+	        case STATE_BUILD_PACKET_TO_DA_2:
+	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
+			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), true);
+                state_in_send_true = STATE_WRITE_DA_PACKET_TO_GCS;
+                state_in_send_false = STATE_BUILD_PACKET_MA_1_TO_GCS;
+			    nrf24_state_now = STATE_SEND;
+			    send_to_gcs_start_time = HAL_GetTick();
+			    break;
+
 	    }
 	    //dump_registers(&nrf24_api_config);
 		nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);

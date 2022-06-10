@@ -4,7 +4,7 @@
  *  Created on: Mar 19, 2022
  *      Author: 1
  */
-
+#include <stdbool.h>
 #include "nRF24L01_PL/nrf24_upper_api.h"
 #include "nRF24L01_PL/nrf24_lower_api_stm32.h"
 #include "ATGM336H/nmea_gps.h"
@@ -66,6 +66,7 @@ int app_main()
 {
     uint8_t state_sd = 88;
 
+    bool radio_flag = true;
 	FATFS fileSystem; // переменная типа FATFS
 	FIL testFile; // хендлер файла
 	UINT testBytes; // количество символов, реально записанных внутрь файла
@@ -159,6 +160,8 @@ int app_main()
 	comp_data = bme_read_data(&bme);
 	pressure_on_ground = (float)comp_data.pressure;
 
+	uint32_t time_nrf_start = 0;
+
 	float temperature_celsius_gyro = 0;
     float acc_g [3];
     float gyro_dps [3];
@@ -196,17 +199,31 @@ int app_main()
 
 		nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
 
+
 		if (rx_status != NRF24_FIFO_EMPTY)
-		{
+		   {
 			nrf24_fifo_read(&nrf24_lower_api_config, rx_buffer, 32);
+			nrf24_fifo_flush_rx(&nrf24_api_config);
 		}
 
-        if (tx_status != NRF24_FIFO_EMPTY)
+		if (rx_status != NRF24_FIFO_NOT_EMPTY || HAL_GetTick() - time_nrf_start >= 1000)
+		{
+			time_nrf_start = HAL_GetTick();
+        if (radio_flag)
         {
-    	    //nrf24_fifo_flush_tx(&nrf24_api_config);
+        	nrf24_fifo_flush_tx(&nrf24_api_config);
+            nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
+            nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
+            radio_flag = !radio_flag;
         }
-        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
-        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
+        else
+        {
+        	nrf24_fifo_flush_tx(&nrf24_api_config);
+ 	        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
+ 	        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
+            radio_flag = !radio_flag;
+        }
+		}
 
         //опускаем флаги
         nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
