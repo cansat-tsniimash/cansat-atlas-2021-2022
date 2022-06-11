@@ -1,10 +1,11 @@
-﻿// parser.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
+// parser.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
 //
 #include <fstream>
 using namespace std;
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <cstring>
 
 unsigned short Crc16(unsigned char* buf, unsigned short len) {
     unsigned short crc = 0xFFFF;
@@ -23,7 +24,7 @@ float read_float(const char* data)
     float retval;
     float* rv_ptr = &retval;
     char* ptr = (char*)rv_ptr;
-    memcpy(ptr, data, 4);
+    std::memcpy(ptr, data, 4);
     return retval;
 }
 
@@ -86,7 +87,7 @@ unsigned short pars_b(unsigned char* buf, size_t len, std::ofstream* fout_ma_typ
                 std::cout << ":" <<(uint16_t)((buf_byte_pack2[24] << 8) | buf_byte_pack2[23]) << std::endl;
 
                 std::cout << "phot:" << read_float((const char*)&buf_byte_pack2[25]) << std::endl;
-                std::cout << "state:" <<(uint8_t)(buf_byte_pack2[29]) << std::endl;
+                std::cout << "state:" <<(int)(buf_byte_pack2[29]) << std::endl;
 
 
 
@@ -106,7 +107,7 @@ unsigned short pars_b(unsigned char* buf, size_t len, std::ofstream* fout_ma_typ
                 *fout_ma_type_2 << (uint16_t)((buf_byte_pack2[24] << 8) | buf_byte_pack2[23]) << ",";
 
                 *fout_ma_type_2 << read_float((const char*)&buf_byte_pack2[25]) << ",";
-                *fout_ma_type_2 <<  (uint8_t)(buf_byte_pack2[29]) << std::endl;
+                *fout_ma_type_2 <<  (int)(buf_byte_pack2[29]) << std::endl;
                 
             }
             else 
@@ -142,7 +143,7 @@ unsigned short pars_b(unsigned char* buf, size_t len, std::ofstream* fout_ma_typ
                 *fout_da_type_1 << (uint16_t)((buf_byte_pack2[2] << 8) | buf_byte_pack_da_1[1]) << ",";
                 *fout_da_type_1 << (uint32_t)((buf_byte_pack_da_1[6] << 24) | (buf_byte_pack_da_1[5] << 16) | (buf_byte_pack_da_1[4] << 8) | buf_byte_pack_da_1[3]) << ",";
                 *fout_da_type_1 << (uint32_t)((buf_byte_pack_da_1[10] << 24) | (buf_byte_pack_da_1[9] << 16) | (buf_byte_pack_da_1[8] << 8) | buf_byte_pack_da_1[7]) << ",";
-                *fout_da_type_1 << buf_byte_pack_da_1[11] << ",";
+                *fout_da_type_1 << (int)buf_byte_pack_da_1[11] << ",";
                 *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[13] << 8) | buf_byte_pack_da_1[12]) << ",";
                 *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[15] << 8) | buf_byte_pack_da_1[14]) << ",";
                 *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[17] << 8) | buf_byte_pack_da_1[16]) << ",";
@@ -176,8 +177,8 @@ unsigned short pars_b(unsigned char* buf, size_t len, std::ofstream* fout_ma_typ
                 *fout_da_type_2 << read_float((const char*)&buf_byte_pack_da_2[7])<< ",";
                 *fout_da_type_2 << read_float((const char*)&buf_byte_pack_da_2[11]) << ",";
                 *fout_da_type_2 << read_float((const char*)&buf_byte_pack_da_2[15]) << ",";
-                *fout_da_type_2 << (uint8_t)(buf_byte_pack_da_2[19]) << ",";
-                *fout_da_type_2 << (uint8_t)(buf_byte_pack_da_2[20]) << std::endl;
+                *fout_da_type_2 << (int)(buf_byte_pack_da_2[19]) << ",";
+                *fout_da_type_2 << (int)(buf_byte_pack_da_2[20]) << std::endl;
 
             }
         }
