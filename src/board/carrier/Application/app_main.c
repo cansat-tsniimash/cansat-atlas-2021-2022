@@ -344,6 +344,8 @@ int app_main()
     uint8_t state_in_send_true;
     uint8_t state_in_send_false;
     size_t packet_size;
+    uint8_t state_sd = 88;
+    uint16_t timer_sync_start = HAL_GetTick();
 
     uint32_t send_to_gcs_start_time = 0;
 	//motor_on();
@@ -352,15 +354,15 @@ int app_main()
 
 	FATFS fileSystem; // переменная типа FATFS
 	FIL testFile; // хендлер файла
-	char testBuffer[16] = "TestTestTestTest"; // данные для записи
 	UINT testBytes; // количество символов, реально записанных внутрь файла
 	FRESULT res; // результат выполнения функции
-	f_mount(&fileSystem, SDPath, 1);
-	 // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
-	uint8_t path[13] = "testfile.bin"; // название файла
-	path[12] = '\0'; // добавляем символ конца строки в конец строки
 
-	res = f_open(&testFile, (char*)path, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
+	if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
+		const char * path = "testFile.bin"; // название файла
+		res = f_open(&testFile, path,  FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
+	}
+	printf("open res %d\n", (int)res);
+
 
 	dump_registers(&nrf24_api_config);
 
@@ -411,11 +413,11 @@ int app_main()
 		pressure_on_ground = (float)comp_data.pressure;
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt, &fix);
-		packet_ma_type_1.latitude = lat;
-		packet_ma_type_1.longitude = lon;
-		packet_ma_type_1.height = (int16_t)(alt*100);
+		packet_ma_type_1.latitude = 13; //lat;
+		packet_ma_type_1.longitude = 14; //lon;
+		packet_ma_type_1.height = 15;//(int16_t)(alt*100);
 		height_on_BME280 = 44330*(1 - pow((float)packet_ma_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
-		packet_ma_type_1.fix = fix;
+		packet_ma_type_1.fix = 5;//fix;
 		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
 		//packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
@@ -483,10 +485,6 @@ int app_main()
 		}
 
 
-
-
-
-
 	    switch (nrf24_state_now)
 	    {
 
@@ -501,9 +499,12 @@ int app_main()
                 state_in_send_false = STATE_BUILD_PACKET_MA_2_TO_GCS;
 			    nrf24_state_now = STATE_SEND;
 			    send_to_gcs_start_time = HAL_GetTick();
-				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), &bw);
-				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
-				f_sync(&testFile);
+				if(state_sd == FR_OK)
+				{
+					res = f_write (&testFile,  (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), &bw);
+					res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
+				}
+
 		        // запись в файл (на sd контроллер пишет не сразу, а по закрытии файла. Также можно использовать эту команду)
 			    break;
 
@@ -519,8 +520,11 @@ int app_main()
 			    nrf24_state_now = STATE_SEND;
 			    send_to_gcs_start_time = HAL_GetTick();
 				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
-				f_sync(&testFile);
-				break;
+		        if(HAL_GetTick() - timer_sync_start >= 2000 && res == FR_OK)
+		        {
+		        	f_sync(&testFile);
+		        	timer_sync_start = HAL_GetTick();
+		        }				break;
 
 	        case STATE_SEND:
 	        	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == GPIO_PIN_RESET)
