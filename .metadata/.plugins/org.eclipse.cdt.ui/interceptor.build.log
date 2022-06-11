@@ -1,0 +1,10 @@
+11:34:17 **** Incremental Build of configuration Debug for project interceptor ****
+make -j4 all 
+arm-none-eabi-size   interceptor.elf 
+   text	   data	    bss	    dec	    hex	filename
+  54232	    144	   4976	  59352	   e7d8	interceptor.elf
+Finished building: default.size.stdout
+ 
+
+11:34:17 Build Finished. 0 errors, 0 warnings. (took 505ms)
+

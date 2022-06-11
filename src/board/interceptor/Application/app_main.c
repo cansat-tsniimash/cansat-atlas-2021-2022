@@ -70,6 +70,7 @@ unsigned short Crc16(unsigned char *buf, unsigned short len) {
 int app_main()
 {
 	uint32_t time;
+	uint16_t timer_sync_start = HAL_GetTick();
     uint8_t state_sd = 88;
 
     bool radio_flag = true;
@@ -199,23 +200,42 @@ int app_main()
 		printf("темп %ld\n ",(int32_t)packet_da_type_1.BME280_temperature);
 		printf("влажность %ld\n ",(int32_t)packet_da_type_1.BME280_humidity);
 
-		if(state_sd == FR_OK)
+
+
+		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
+
+		for (int i= 0; i < 3 ; i++)
 		{
-			res = f_write (&testFile,  (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &bw);
-			res = f_write (&testFile,  (uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2), &bw);
-			f_sync(&testFile);
+			packet_da_type_1.LSM6DSL_accelerometer[i] = (int16_t)(acc_g[i]*1000);
 		}
 
-		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &packet_da_type_1.LSM6DSL_accelerometer, &packet_da_type_1.LSM6DSL_gyroscope);
+		for (int i= 0; i < 3 ; i++)
+		{
+			packet_da_type_1. LSM6DSL_gyroscope[i] = (int16_t)(gyro_dps[i]*1000);
+
+		}
+
 
 		gps_work();
-		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height);
+		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height, &packet_da_type_2.fix);
 
 
 		nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
 
 		packet_da_type_1.sum = Crc16((uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1) - 2);
 		packet_da_type_2.sum = Crc16((uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2) - 2);
+
+		if(state_sd == FR_OK)
+		{
+			res = f_write (&testFile,  (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &bw);
+			res = f_write (&testFile,  (uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2), &bw);
+		}
+
+        if(HAL_GetTick() - timer_sync_start >= 2000)
+        {
+        	f_sync(&testFile);
+        	timer_sync_start = HAL_GetTick();
+        }
 
 		if (rx_status != NRF24_FIFO_EMPTY)
 		   {
