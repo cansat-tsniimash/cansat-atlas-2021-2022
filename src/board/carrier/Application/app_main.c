@@ -17,6 +17,7 @@
 #include "fatfs.h"
 #include "LIS3MDL/DLIS3.h"
 #include "1Wire_DS18B20/one_wire.h"
+#include "buzzer.h"
 
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
 #define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
@@ -344,7 +345,7 @@ int app_main()
     uint8_t state_in_send_true;
     uint8_t state_in_send_false;
     size_t packet_size;
-    uint8_t state_sd = 88;
+    uint8_t state_sd = 88, state_sd_bme = 88;
     uint16_t timer_sync_start = HAL_GetTick();
 
     uint32_t send_to_gcs_start_time = 0;
@@ -353,16 +354,18 @@ int app_main()
     lisset_sr(&lis3mdl_ctx, &lis_interface);
 
 	FATFS fileSystem; // переменная типа FATFS
-	FIL testFile; // хендлер файла
+	FIL testFile, bme_hei_file; // хендлер файла
 	UINT testBytes; // количество символов, реально записанных внутрь файла
-	FRESULT res; // результат выполнения функции
+	FRESULT res, res_bme; // результат выполнения функции
 
 	if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
 		const char * path = "testFile.bin"; // название файла
 		res = f_open(&testFile, path,  FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
-	}
-	printf("open res %d\n", (int)res);
+		const char * path1 = "bme_hei_file.csv"; // название файла
 
+		res = f_open(&bme_hei_file, path1, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
+
+	}
 
 	dump_registers(&nrf24_api_config);
 
@@ -370,6 +373,8 @@ int app_main()
 	ds18b20_start_conversion(&ds18b20);
 	while(1)
 	{
+
+
 		comp_data = bme_read_data(&bme);
 		packet_ma_type_1.BME280_pressure = (float)comp_data.pressure;
 		packet_ma_type_1.BME280_temperature = (float)comp_data.temperature;
@@ -408,7 +413,7 @@ int app_main()
 
 
 
-		uint16_t height_on_BME280;
+		float height_on_BME280;
 		uint32_t pressure_on_ground;
 		pressure_on_ground = (float)comp_data.pressure;
 		gps_work();
@@ -418,6 +423,14 @@ int app_main()
 		packet_ma_type_1.height = 15;//(int16_t)(alt*100);
 		height_on_BME280 = 44330*(1 - pow((float)packet_ma_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
 		packet_ma_type_1.fix = 5;//fix;
+
+		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
+
+		if(state_sd == FR_OK)
+		{
+			f_printf(&bme_hei_file, "%ld\n", (int32_t)(height_on_BME280*100));
+		}
+
 		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
 		//packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
@@ -520,11 +533,7 @@ int app_main()
 			    nrf24_state_now = STATE_SEND;
 			    send_to_gcs_start_time = HAL_GetTick();
 				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
-		        if(HAL_GetTick() - timer_sync_start >= 2000 && res == FR_OK)
-		        {
-		        	f_sync(&testFile);
-		        	timer_sync_start = HAL_GetTick();
-		        }				break;
+				break;
 
 	        case STATE_SEND:
 	        	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == GPIO_PIN_RESET)
@@ -594,6 +603,12 @@ int app_main()
 			    break;
 
 	    }
+        if(HAL_GetTick() - timer_sync_start >= 2000 && res == FR_OK)
+        {
+        	f_sync(&testFile);
+        	f_sync(&bme_hei_file);
+        	timer_sync_start = HAL_GetTick();
+        }
 	    //dump_registers(&nrf24_api_config);
 		//nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}

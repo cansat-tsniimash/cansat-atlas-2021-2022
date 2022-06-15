@@ -59,6 +59,12 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define WIRE_1_PIN_Pin GPIO_PIN_1
 #define WIRE_1_PIN_GPIO_Port GPIOA
+#define BUTTON_Pin GPIO_PIN_5
+#define BUTTON_GPIO_Port GPIOA
+#define BUZZER_Pin GPIO_PIN_10
+#define BUZZER_GPIO_Port GPIOB
+#define MOTOR_Pin GPIO_PIN_8
+#define MOTOR_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

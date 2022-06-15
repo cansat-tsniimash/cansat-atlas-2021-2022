@@ -1,10 +1,10 @@
 #include <stm32f4xx_hal.h>
 #include <stdbool.h>
 
-#define MOTOR_TRIGGER_PORT GPIOB
+#define MOTOR_TRIGGER_PORT GPIOA
 #define MOTOR_TRIGGER_PIN GPIO_PIN_5
 
-#define BOARD_TRIGGER_PORT GPIOB
+#define BOARD_TRIGGER_PORT GPIOA
 #define BOARD_TRIGGER_PIN GPIO_PIN_6
 
 bool check_out_motor_trigger()

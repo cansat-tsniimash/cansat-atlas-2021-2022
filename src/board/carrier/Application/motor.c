@@ -1,14 +1,14 @@
 #include <stm32f4xx_hal.h>
 
 #define MOTOR_PORT GPIOB
-#define MOTOR_PIN GPIO_PIN_4
+#define MOTOR_PIN GPIO_PIN_8
 
 void motor_on ()
 {
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4,  GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8,  GPIO_PIN_SET);
 }
 
 void motor_off ()
 {
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4,  GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8,  GPIO_PIN_RESET);
 }
