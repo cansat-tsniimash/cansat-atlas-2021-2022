@@ -193,14 +193,13 @@ unsigned short Crc16(unsigned char *buf, unsigned short len) {
 
 int app_main()
 {
-	uint32_t time;
 	uint16_t timer_sync_start = HAL_GetTick();
     uint8_t state_sd = 88;
 
     bool radio_flag = true;
 	FATFS fileSystem; // переменная типа FATFS
 	FIL testFile; // хендлер файла
-	UINT testBytes; // количество символов, реально записанных внутрь файла
+	UINT bw; // количество символов, реально записанных внутрь файла
 	FRESULT res = FR_INT_ERR; // результат выполнения функции
 
 	if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
@@ -212,8 +211,7 @@ int app_main()
 	//берем изначальное давление для барометрической формулы
 	uint32_t pressure_on_ground;
 
-    UINT bw;
-	float height_BME280 = 0;
+
 	struct bme280_dev bme = {0};	//инициализируем настройки бме280
 	struct bme_spi_intf bme280_buffer;
 	bme280_buffer.GPIO_Port = GPIOC;
@@ -234,8 +232,8 @@ int app_main()
 	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);
 
 	//создаем структуру пакетов
-	packet_da_type_1_t packet_da_type_1 = {0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0};
-	packet_da_type_2_t packet_da_type_2 = {0, 2, 0, 4, 0, 6, 0, 8, 0};
+	packet_da_type_1_t packet_da_type_1 = {0};
+	packet_da_type_2_t packet_da_type_2 = {0};
 
 	//поднимаем флаги для определения пакетов
 	packet_da_type_1.flag = 0xfa;
@@ -243,7 +241,7 @@ int app_main()
 
 	nrf24_spi_pins_t nrf24_spi_pins;
 	nrf24_spi_pins.ce_port = GPIOA;
-	nrf24_spi_pins.ce_pin = GPIO_PIN_10;
+	nrf24_spi_pins.ce_pin = GPIO_PIN_8;
 	nrf24_spi_pins.cs_pin = GPIO_PIN_15;
 	nrf24_spi_pins.cs_port = GPIOC;
 
@@ -281,13 +279,13 @@ int app_main()
 
 	nrf24_mode_standby(&nrf24_lower_api_config);
 
-	uint8_t rx_buffer[32];
+	uint8_t rx_buffer[32] = {0};
 
 	nrf24_fifo_status_t rx_status = 0;
     nrf24_fifo_status_t tx_status = 0;
 	nrf24_mode_rx(&nrf24_lower_api_config);
 
-	int64_t cookie;
+	int64_t cookie = 0;
 	struct bme280_data comp_data = {0};
 	comp_data = bme_read_data(&bme);
 	pressure_on_ground = (float)comp_data.pressure;
@@ -299,36 +297,21 @@ int app_main()
     float gyro_dps [3];
     uint16_t packet_num_1 = 0;
     uint16_t packet_num_2 = 0;
+    int fix2;
 
 	float height_on_BME280 = 0;
 	while(true)
 	{
 		dump_registers(&nrf24_lower_api_config);
 
-		time = HAL_GetTick();
-
-		packet_da_type_1.time = HAL_GetTick();
-		packet_da_type_2.time = HAL_GetTick();
-
-		//comp_data = bme_read_data(&bme);
+		comp_data = bme_read_data(&bme);
 		packet_da_type_1.BME280_pressure = (uint32_t)comp_data.pressure;
-		packet_da_type_1.num = num;
-		packet_da_type_2.num = num;
 		packet_da_type_1.BME280_temperature = (int16_t)(comp_data.temperature*100);
 		packet_da_type_1.BME280_humidity = (uint16_t)comp_data.humidity;
 
-		num++;
-
 		height_on_BME280 = 44330*(1 - pow((float)packet_da_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
 
-		printf("высота %ld\n ",(int32_t)(height_on_BME280*100));
-		printf("давл %ld\n ",(int32_t)packet_da_type_1.BME280_pressure);
-		printf("темп %ld\n ",(int32_t)packet_da_type_1.BME280_temperature);
-		printf("влажность %ld\n ",(int32_t)packet_da_type_1.BME280_humidity);
-
-
-
-		//lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
+		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
 
 		for (int i= 0; i < 3 ; i++)
 		{
@@ -341,12 +324,16 @@ int app_main()
 
 		}
 
-
 		gps_work();
-		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height, &packet_da_type_2.fix);
+		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height, &fix2);
+		packet_da_type_2.fix = (uint8_t)fix2;
 
+		packet_da_type_1.time = HAL_GetTick();
+		packet_da_type_2.time = HAL_GetTick();
 
-		nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
+		packet_da_type_1.num = num;
+		packet_da_type_2.num = num;
+		num++;
 
 		packet_da_type_1.sum = Crc16((uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1) - 2);
 		packet_da_type_2.sum = Crc16((uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2) - 2);
@@ -363,29 +350,31 @@ int app_main()
         	timer_sync_start = HAL_GetTick();
         }
 
+		nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
+
 		if (rx_status != NRF24_FIFO_EMPTY)
-		   {
+		{
 			nrf24_fifo_read(&nrf24_lower_api_config, rx_buffer, 32);
 			nrf24_fifo_flush_rx(&nrf24_lower_api_config);
-		   }
+		}
 
 		if (rx_status != NRF24_FIFO_NOT_EMPTY || HAL_GetTick() - time_nrf_start >= 1000)
 		{
 			time_nrf_start = HAL_GetTick();
-        if (radio_flag)
-        {
-        	nrf24_fifo_flush_tx(&nrf24_lower_api_config);
-            nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
-            nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
-            radio_flag = !radio_flag;
-        }
-        else
-        {
-        	nrf24_fifo_flush_tx(&nrf24_lower_api_config);
- 	        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
- 	        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
-            radio_flag = !radio_flag;
-        }
+			if (radio_flag)
+			{
+				nrf24_fifo_flush_tx(&nrf24_lower_api_config);
+				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
+				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
+				radio_flag = !radio_flag;
+			}
+			else
+			{
+				nrf24_fifo_flush_tx(&nrf24_lower_api_config);
+				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
+				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
+				radio_flag = !radio_flag;
+			}
 		}
 
         //опускаем флаги
