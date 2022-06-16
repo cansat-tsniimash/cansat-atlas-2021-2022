@@ -40,7 +40,6 @@ typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
 	STATE_BUILD_PACKET_TO_DA_1,
 	STATE_SEND,
 	STATE_WRITE_DA_PACKET_TO_GCS,
-	STATE_SEND_PACKET_FROM_DA_TO_GCS,
 	STATE_BUILD_PACKET_TO_DA_2
 }nrf24_state_t;
 
@@ -216,6 +215,8 @@ unsigned short Crc16(unsigned char *buf, unsigned short len) {
 
 int app_main()
 {
+	motor_off();
+	bzr_off();
 	ds18b20_t ds18b20;
 	ds18b20.onewire_pin = GPIO_PIN_1;
 	ds18b20.onewire_port = GPIOA;
@@ -311,16 +312,11 @@ int app_main()
 	packet_ma_type_2_t packet_ma_type_2 = {0};
 	packet_ma_type_1.flag = 0xff;
 	packet_ma_type_2.flag = 0xfe;
-    uint16_t height;
-	uint32_t time_btn_now = HAL_GetTick();
 	uint8_t da_1_rx_buffer[32];
 	uint32_t start_time = 0;
 	state_t state_now = STATE_INIT;
 	nrf24_state_t nrf24_state_now = STATE_BUILD_PACKET_MA_1_TO_GCS;
-	nrf24_fifo_status_t rx_status;
-	nrf24_fifo_status_t tx_status;
 	int comp;
-	uint8_t da_1_resp_count = 0;
 	float lux_rn = 0;
 	float lux_sun = 0;
 	//создаем переменные для записи телеметрии gps
@@ -337,15 +333,14 @@ int app_main()
     nrf24_mode_tx(&nrf24_api_config);
     float mag[3];
     uint32_t start_time_ds = 0;
-    uint32_t now_time_ds = 0;
     uint16_t temp_ds18b20;
     bool crc_ok_ds;
     int fix;
-    UINT bw;
+
     uint8_t state_in_send_true;
     uint8_t state_in_send_false;
     size_t packet_size;
-    uint8_t state_sd = 88, state_sd_bme = 88;
+    uint8_t state_sd = 88;
     uint16_t timer_sync_start = HAL_GetTick();
 
     uint32_t send_to_gcs_start_time = 0;
@@ -355,8 +350,8 @@ int app_main()
 
 	FATFS fileSystem; // переменная типа FATFS
 	FIL testFile, bme_hei_file; // хендлер файла
-	UINT testBytes; // количество символов, реально записанных внутрь файла
-	FRESULT res, res_bme; // результат выполнения функции
+    UINT bw; // количество символов, реально записанных внутрь файла
+	FRESULT res; // результат выполнения функции
 
 	if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
 		const char * path = "testFile.bin"; // название файла
@@ -366,6 +361,11 @@ int app_main()
 		res = f_open(&bme_hei_file, path1, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
 
 	}
+
+	float height_on_BME280;
+	uint32_t pressure_on_ground;
+	comp_data = bme_read_data(&bme);
+	pressure_on_ground = (float)comp_data.pressure;
 
 	dump_registers(&nrf24_api_config);
 
@@ -400,7 +400,6 @@ int app_main()
 
 
 
-		now_time_ds = HAL_GetTick();
 		if (HAL_GetTick()-start_time_ds >= 750)
 		{
 			ds18b20_read_raw_temperature(&ds18b20, &temp_ds18b20, &crc_ok_ds);
@@ -410,19 +409,13 @@ int app_main()
 		}
 
 
-
-
-
-		float height_on_BME280;
-		uint32_t pressure_on_ground;
-		pressure_on_ground = (float)comp_data.pressure;
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt, &fix);
-		packet_ma_type_1.latitude = 13; //lat;
-		packet_ma_type_1.longitude = 14; //lon;
-		packet_ma_type_1.height = 15;//(int16_t)(alt*100);
-		height_on_BME280 = 44330*(1 - pow((float)packet_ma_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
-		packet_ma_type_1.fix = 5;//fix;
+		packet_ma_type_1.latitude = lat;
+		packet_ma_type_1.longitude = lon;
+		packet_ma_type_1.height = (int16_t)(alt*100);
+		height_on_BME280 = 44330.0*(1.0 - pow((float)packet_ma_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
+		packet_ma_type_1.fix = fix;
 
 		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
 
@@ -449,15 +442,14 @@ int app_main()
 		case STATE_ON_GROUND:
 			if (check_out_board_trigger() == true)
 			{
-
+				start_time = HAL_GetTick();
 				state_now = STATE_WAIT;
 			}
 
 			break;
 
 		case STATE_WAIT:
-			time_btn_now = HAL_GetTick();
-		    if(time_btn_now > start_time + TIME_WAIT_BTN_PHOTOREZ)
+		    if(HAL_GetTick() > start_time + TIME_WAIT_BTN_PHOTOREZ)
 		    {
 				state_now = STATE_IN_RN;
 				lux_rn = photorezistor_get_lux(photoresistor);
