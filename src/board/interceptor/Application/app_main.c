@@ -14,6 +14,7 @@
 #include "../stm32f1/LSM6DS3/DLSM.h"
 #include "fatfs.h"
 
+#define ROLE false
 
 extern UART_HandleTypeDef huart3;
 
@@ -193,53 +194,7 @@ unsigned short Crc16(unsigned char *buf, unsigned short len) {
 
 int app_main()
 {
-	uint32_t time;
-	uint16_t timer_sync_start = HAL_GetTick();
-    uint8_t state_sd = 88;
-
-    bool radio_flag = true;
-	FATFS fileSystem; // переменная типа FATFS
-	FIL testFile; // хендлер файла
-	UINT testBytes; // количество символов, реально записанных внутрь файла
-	FRESULT res = FR_INT_ERR; // результат выполнения функции
-
-	if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
-		const char * path = "testfile_da2.bin"; // название файла
-		res = f_open(&testFile, path,  FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
-	}
-	printf("open res %d\n", (int)res);
-
-	//берем изначальное давление для барометрической формулы
-	uint32_t pressure_on_ground;
-
-    UINT bw;
-	float height_BME280 = 0;
-	struct bme280_dev bme = {0};	//инициализируем настройки бме280
-	struct bme_spi_intf bme280_buffer;
-	bme280_buffer.GPIO_Port = GPIOC;
-	bme280_buffer.GPIO_Pin = GPIO_PIN_13;
-	bme280_buffer.spi =  &hspi1;
-	bme_init_default(&bme, &bme280_buffer);
-
-	struct lsm_spi_intf lsm_intf;
-	lsm_intf.GPIO_Pin = GPIO_PIN_14;
-	lsm_intf.GPIO_Port = GPIOC;
-	lsm_intf.spi = &hspi1;
-
-	stmdev_ctx_t stmdev_ctx;
-	lsmset(&stmdev_ctx, &lsm_intf);
-
-	//инициализация гпс
-	gps_init();
-	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);
-
-	//создаем структуру пакетов
-	packet_da_type_1_t packet_da_type_1 = {0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0};
-	packet_da_type_2_t packet_da_type_2 = {0, 2, 0, 4, 0, 6, 0, 8, 0};
-
-	//поднимаем флаги для определения пакетов
-	packet_da_type_1.flag = 0xfa;
-	packet_da_type_2.flag = 0xfb;
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
 
 	nrf24_spi_pins_t nrf24_spi_pins;
 	nrf24_spi_pins.ce_port = GPIOA;
@@ -267,135 +222,87 @@ int app_main()
 	nrf24_protocol_config.auto_retransmit_delay = 15;
 	nrf24_protocol_config.crc_size = NRF24_CRCSIZE_1BYTE;
 	nrf24_protocol_config.en_ack_payload = true;
-	nrf24_protocol_config.en_dyn_ack = true;
-	nrf24_protocol_config.en_dyn_payload_size = true;
+	nrf24_protocol_config.en_dyn_ack = false;
+	nrf24_protocol_config.en_dyn_payload_size = false;
 	nrf24_setup_protocol(&nrf24_lower_api_config, &nrf24_protocol_config);
 
 	//настройка пайпа(штука , чтобы принимать)
 	nrf24_pipe_config_t pipe_config;
 	pipe_config.address = 0xafafafaf01;
 	pipe_config.enable_auto_ack = true;
-	pipe_config.payload_size = -1;
+	pipe_config.payload_size = 32;
 	nrf24_pipe_rx_start(&nrf24_lower_api_config, 0, &pipe_config);
-	uint16_t num = 0;
+
+	for (int i = 1; i < 6; i++)
+	{
+		pipe_config.address = 0xcfcfcfcfcf;
+		pipe_config.address = (pipe_config.address & ~((uint64_t)0xff << 32)) | ((uint64_t)i << 32);
+		pipe_config.enable_auto_ack = true;
+		pipe_config.payload_size = 32;
+		nrf24_pipe_rx_start(&nrf24_lower_api_config, i, &pipe_config);
+	}
 
 	nrf24_pipe_set_tx_addr(&nrf24_lower_api_config, 0xafafafaf01);
 
 	nrf24_mode_standby(&nrf24_lower_api_config);
 
 	uint8_t rx_buffer[32] = {0};
+	uint8_t tx_buffer[32] = "Kto tuta";
+	uint8_t tx_ack_pl_buffer[32] = "Ya DA1, vosraduysya Artem";
 
 	nrf24_fifo_status_t rx_status = 0;
     nrf24_fifo_status_t tx_status = 0;
-	nrf24_mode_rx(&nrf24_lower_api_config);
+    if (ROLE)
+    {
 
-	int64_t cookie;
-	struct bme280_data comp_data = {0};
-	comp_data = bme_read_data(&bme);
-	pressure_on_ground = (float)comp_data.pressure;
+		nrf24_fifo_flush_tx(&nrf24_lower_api_config);
+		nrf24_fifo_flush_rx(&nrf24_lower_api_config);
+		//nrf24_fifo_write(&nrf24_lower_api_config ,(uint8_t *)&tx_buffer, sizeof(tx_buffer), true);
+    }
+    else
+    {
+    	nrf24_mode_rx(&nrf24_lower_api_config);
+		nrf24_fifo_flush_tx(&nrf24_lower_api_config);
+		nrf24_fifo_flush_rx(&nrf24_lower_api_config);
+		nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&tx_ack_pl_buffer, 32);//sizeof(tx_ack_pl_buffer));
+    }
 
-	uint32_t time_nrf_start = 0;
-
-	float temperature_celsius_gyro = 0;
-    float acc_g [3];
-    float gyro_dps [3];
-    uint16_t packet_num_1 = 0;
-    uint16_t packet_num_2 = 0;
-	float height_on_BME280 = 0;
 	while(true)
 	{
+
 		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
-		HAL_Delay(100);
+
+		if (ROLE)
+		{
+			nrf24_mode_tx(&nrf24_lower_api_config);
+			HAL_Delay(100);
+			nrf24_mode_standby(&nrf24_lower_api_config);
+		}
 
 		dump_registers(&nrf24_lower_api_config);
 
-		time = HAL_GetTick();
-
-		packet_da_type_1.time = HAL_GetTick();
-		packet_da_type_2.time = HAL_GetTick();
-
-		comp_data = bme_read_data(&bme);
-		packet_da_type_1.BME280_pressure = (uint32_t)comp_data.pressure;
-		packet_da_type_1.num = num;
-		packet_da_type_2.num = num;
-		packet_da_type_1.BME280_temperature = (int16_t)(comp_data.temperature*100);
-		packet_da_type_1.BME280_humidity = (uint16_t)comp_data.humidity;
-
-		num++;
-
-		height_on_BME280 = 44330*(1 - pow((float)packet_da_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
-
-		printf("высота %ld\n ",(int32_t)(height_on_BME280*100));
-		printf("давл %ld\n ",(int32_t)packet_da_type_1.BME280_pressure);
-		printf("темп %ld\n ",(int32_t)packet_da_type_1.BME280_temperature);
-		printf("влажность %ld\n ",(int32_t)packet_da_type_1.BME280_humidity);
-
-
-
-		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
-
-		for (int i= 0; i < 3 ; i++)
-		{
-			packet_da_type_1.LSM6DSL_accelerometer[i] = (int16_t)(acc_g[i]*1000);
-		}
-
-		for (int i= 0; i < 3 ; i++)
-		{
-			packet_da_type_1. LSM6DSL_gyroscope[i] = (int16_t)(gyro_dps[i]*1000);
-
-		}
-
-
-		gps_work();
-		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height, &packet_da_type_2.fix);
-
-
-		nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
-		//HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
-
-		packet_da_type_1.sum = Crc16((uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1) - 2);
-		packet_da_type_2.sum = Crc16((uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2) - 2);
-
-		if(state_sd == FR_OK)
-		{
-			res = f_write (&testFile,  (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &bw);
-			res = f_write (&testFile,  (uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2), &bw);
-		}
-
-        if(HAL_GetTick() - timer_sync_start >= 2000 && res == FR_OK)
-        {
-        	f_sync(&testFile);
-        	timer_sync_start = HAL_GetTick();
-        }
-
+        nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
 		if (rx_status != NRF24_FIFO_EMPTY)
-		   {
+		{
+			uint8_t rx_packet_size;
+			uint8_t rx_pipe_no;
+			bool tx_full;
+			nrf24_fifo_peek(&nrf24_lower_api_config, &rx_packet_size, &rx_pipe_no, &tx_full);
 			nrf24_fifo_read(&nrf24_lower_api_config, rx_buffer, 32);
 			nrf24_fifo_flush_rx(&nrf24_lower_api_config);
-		   }
-
-		if (rx_status != NRF24_FIFO_NOT_EMPTY || HAL_GetTick() - time_nrf_start >= 1000)
-		{
-			time_nrf_start = HAL_GetTick();
-        if (radio_flag)
-        {
-        	nrf24_fifo_flush_tx(&nrf24_lower_api_config);
-            nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
-            nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
-            radio_flag = !radio_flag;
-        }
-        else
-        {
-        	nrf24_fifo_flush_tx(&nrf24_lower_api_config);
- 	        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
- 	        nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
-            radio_flag = !radio_flag;
-        }
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
+			HAL_Delay(100);
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
 		}
+        //HAL_Delay(200);
+        //nrf24_fifo_write(&nrf24_lower_api_config ,(uint8_t *)&tx_buffer, 32, true);//sizeof(tx_buffer), true);
 
+		int comp = 0;
+		nrf24_irq_get(&nrf24_lower_api_config, &comp);
         //опускаем флаги
-        nrf24_irq_clear(&nrf24_lower_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
+        nrf24_irq_clear(&nrf24_lower_api_config, comp);
+        nrf24_irq_get(&nrf24_lower_api_config, &comp);
 
     }
 	return 0;
