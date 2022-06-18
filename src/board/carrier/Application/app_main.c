@@ -267,7 +267,7 @@ int app_main()
 	nrf24_lower_api_config_t nrf24_api_config;
 	nrf24_spi_init_sr(&nrf24_api_config, &hspi2, &nrf24_spi_pins_sr);
 
-	nrf24_mode_standby(&nrf24_api_config);
+	nrf24_mode_power_down(&nrf24_api_config);
 	// Настройки радиопередачи
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
@@ -282,8 +282,8 @@ int app_main()
 	nrf24_protocol_config.auto_retransmit_delay = 15;
 	nrf24_protocol_config.crc_size = NRF24_CRCSIZE_1BYTE;
 	nrf24_protocol_config.en_ack_payload = true;
-	nrf24_protocol_config.en_dyn_ack = true;
-	nrf24_protocol_config.en_dyn_payload_size = true;
+	nrf24_protocol_config.en_dyn_ack = false;
+	nrf24_protocol_config.en_dyn_payload_size = false;
 	nrf24_setup_protocol(&nrf24_api_config, &nrf24_protocol_config);
 
 	float temperature_celsius_mag;
@@ -305,6 +305,8 @@ int app_main()
 	}
 
 	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
+
+	nrf24_mode_standby(&nrf24_api_config);
 
 	//заполнение структуры на фоторезистор
 	photorezistor_t photoresistor;
@@ -621,8 +623,6 @@ int app_main()
         	f_sync(&bme_hei_file);
         	timer_sync_start = HAL_GetTick();
         }
-	    //dump_registers(&nrf24_api_config);
-		//nrf24_irq_clear(&nrf24_api_config, NRF24_IRQ_RX_DR | NRF24_IRQ_TX_DR | NRF24_IRQ_MAX_RT);
 	}
 	return 0;
     }
