@@ -249,7 +249,7 @@ int app_main()
 
 	nrf24_lower_api_config_t nrf24_lower_api_config;
 
-	nrf24_spi_init(&nrf24_lower_api_config, &hspi2, &nrf24_spi_pins);
+	nrf24_spi_init(&nrf24_lower_api_config, &hspi1, &nrf24_spi_pins);
 
 	nrf24_mode_power_down(&nrf24_lower_api_config);
 
