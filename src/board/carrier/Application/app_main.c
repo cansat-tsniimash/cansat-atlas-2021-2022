@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "motor.h"
+#include "led.h"
 #include "triggers.h"
 #include "config.h"
 #include "nRF24L01_PL/nrf24_upper_api.h"
@@ -405,6 +406,7 @@ int app_main()
     uint16_t temp_ds18b20;
     bool crc_ok_ds;
     uint32_t start_time_io = HAL_GetTick();
+    uint32_t start_tima_bulb = HAL_GetTick();
     int fix;
 
     uint8_t state_in_send_true;
@@ -470,6 +472,8 @@ int app_main()
 			start_time_ds = HAL_GetTick();
 		}
 
+		packet_ma_type_2.state = packet_ma_type_2.state & ~(0x07 << 2);
+		packet_ma_type_2.state = packet_ma_type_2.state | (state_t << 3);
 
 		gps_work();
 		gps_get_coords(&cookie,  & lat,  & lon,& alt, &fix);
@@ -478,9 +482,22 @@ int app_main()
 		packet_ma_type_1.height = (int16_t)(alt*100);
 		height_on_BME280 = 44330.0*(1.0 - pow((float)packet_ma_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
 		packet_ma_type_1.fix = fix;
+        if (fix >= 1)
+        {
+        	packet_ma_type_2.state |= 1 << 1;
+			led_sens_per(shift_reg_sens, 8);
+        }
 
 		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
 
+		if(state_sd == FR_OK)
+		{
+			packet_ma_type_2.state |= 1 << 0;
+			led_sens_per(shift_reg_sens, 2);
+			f_printf(&bme_hei_file, "%ld\n", (int32_t)(height_on_BME280*100));
+		}
+
+		packet_ma_type_2.state_sd |= 1 << 0;
 
 		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
@@ -490,6 +507,12 @@ int app_main()
 		switch (state_now)
 		{
 		case STATE_INIT:
+    		led_nrf_on(shift_reg_nrf, 7, 1);
+            start_tima_bulb = HAL_GetTick();
+            if (HAL_GetTick() - start_tima_bulb > 500)
+            {
+        		led_nrf_on(shift_reg_nrf, 7, 10);
+            }
 			if (check_out_board_trigger() == false)
 			{
 				if (HAL_GetTick() >= start_time_io + 50)
@@ -518,9 +541,9 @@ int app_main()
 			}
 			else
 			{
-				start_time_io = HAL_GetTick();
 			}
-		    break;
+
+			break;
 
 		case STATE_WAIT:
 		    if(HAL_GetTick() > start_time + TIME_WAIT_BTN_PHOTOREZ)
@@ -619,6 +642,11 @@ int app_main()
 		            	nrf24_state_now = state_in_send_false;
 		            	break;
 					}
+	        		else
+	        		{
+		            	nrf24_fifo_flush_tx(&nrf24_api_config);
+	        			nrf24_state_now = state_in_send_false;
+	        		}
 	            }
 	            if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
 	            {
