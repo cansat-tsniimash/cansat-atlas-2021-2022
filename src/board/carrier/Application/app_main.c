@@ -288,13 +288,23 @@ int app_main()
 
 	float temperature_celsius_mag;
 
-	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xacacacacac);
-
+	//настройка пайпа(штука , чтобы принимать)
 	nrf24_pipe_config_t pipe_config;
 	pipe_config.address = 0xafafafaf01;
 	pipe_config.enable_auto_ack = true;
-	pipe_config.payload_size = -1;
+	pipe_config.payload_size = 32;
 	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
+
+	for (int i = 1; i < 6; i++)
+	{
+		pipe_config.address = 0xcfcfcfcfcf;
+		pipe_config.address = (pipe_config.address & ~((uint64_t)0xff << 32)) | ((uint64_t)i << 32);
+		pipe_config.enable_auto_ack = true;
+		pipe_config.payload_size = 32;
+		nrf24_pipe_rx_start(&nrf24_api_config, i, &pipe_config);
+	}
+
+	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
 
 	//заполнение структуры на фоторезистор
 	photorezistor_t photoresistor;
@@ -335,6 +345,7 @@ int app_main()
     uint32_t start_time_ds = 0;
     uint16_t temp_ds18b20;
     bool crc_ok_ds;
+    uint32_t start_time_io = HAL_GetTick();
     int fix;
 
     uint8_t state_in_send_true;
@@ -434,19 +445,33 @@ int app_main()
 		case STATE_INIT:
 			if (check_out_board_trigger() == false)
 			{
-				lux_sun = photorezistor_get_lux(photoresistor);
-				state_now = STATE_ON_GROUND;
+				if (HAL_GetTick() >= start_time_io + 50)
+				{
+					lux_sun = photorezistor_get_lux(photoresistor);
+					state_now = STATE_ON_GROUND;
+					start_time_io = HAL_GetTick();
+				}
+			}
+			else
+			{
+				start_time_io = HAL_GetTick();
 			}
 		    break;
 
 		case STATE_ON_GROUND:
 			if (check_out_board_trigger() == true)
 			{
-				start_time = HAL_GetTick();
-				state_now = STATE_WAIT;
+				if (HAL_GetTick() >= start_time_io + 50)
+				{
+					start_time = HAL_GetTick();
+					state_now = STATE_WAIT;
+				}
 			}
-
-			break;
+			else
+			{
+				start_time_io = HAL_GetTick();
+			}
+		    break;
 
 		case STATE_WAIT:
 		    if(HAL_GetTick() > start_time + TIME_WAIT_BTN_PHOTOREZ)
@@ -485,7 +510,7 @@ int app_main()
 			break;
 
 		case STATE_SEPARATED:
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+			 bzr_on();
 			break;
 		}
 
@@ -507,7 +532,6 @@ int app_main()
 				if(state_sd == FR_OK)
 				{
 					res = f_write (&testFile,  (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), &bw);
-					res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
 				}
 
 		        // запись в файл (на sd контроллер пишет не сразу, а по закрытии файла. Также можно использовать эту команду)
@@ -524,7 +548,10 @@ int app_main()
                 state_in_send_false = STATE_BUILD_PACKET_TO_DA_1;
 			    nrf24_state_now = STATE_SEND;
 			    send_to_gcs_start_time = HAL_GetTick();
-				res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
+				if(state_sd == FR_OK)
+				{
+					res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
+				}
 				break;
 
 	        case STATE_SEND:
@@ -543,11 +570,6 @@ int app_main()
 		            	nrf24_state_now = state_in_send_false;
 		            	break;
 					}
-	        		else
-	        		{
-		            	nrf24_fifo_flush_tx(&nrf24_api_config);
-	        			nrf24_state_now = state_in_send_false;
-	        		}
 	            }
 	            if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
 	            {
@@ -573,8 +595,6 @@ int app_main()
 					nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
 					nrf24_fifo_write(&nrf24_api_config, (uint8_t *)da_1_rx_buffer, packet_size, false);
 					res = f_write (&testFile, (uint8_t *)da_1_rx_buffer, packet_size, &bw);
-					f_sync(&testFile);
-
 					send_to_gcs_start_time = HAL_GetTick();
 					state_in_send_true = state_in_send_false;
 					nrf24_state_now = STATE_SEND;

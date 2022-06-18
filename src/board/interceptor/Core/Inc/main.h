@@ -71,6 +71,8 @@ void Error_Handler(void);
 #define CS_SD_GPIO_Port GPIOB
 #define CE_NRF24L01_Pin GPIO_PIN_8
 #define CE_NRF24L01_GPIO_Port GPIOA
+#define LED_Pin GPIO_PIN_5
+#define LED_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

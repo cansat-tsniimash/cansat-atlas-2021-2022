@@ -13,6 +13,8 @@
 #include "BME280/DriverForBME280.h"
 #include "../stm32f1/LSM6DS3/DLSM.h"
 #include "fatfs.h"
+#include <stm32f1xx_hal.h>
+
 
 
 extern UART_HandleTypeDef huart3;
@@ -255,7 +257,7 @@ int app_main()
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
 	nrf24_rf_config.rf_channel = 100;
-	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_18_DBM;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_6_DBM;
 	nrf24_setup_rf(&nrf24_lower_api_config, &nrf24_rf_config);
 
 	// Настроили протокол
@@ -265,17 +267,27 @@ int app_main()
 	nrf24_protocol_config.auto_retransmit_delay = 15;
 	nrf24_protocol_config.crc_size = NRF24_CRCSIZE_1BYTE;
 	nrf24_protocol_config.en_ack_payload = true;
-	nrf24_protocol_config.en_dyn_ack = true;
-	nrf24_protocol_config.en_dyn_payload_size = true;
+	nrf24_protocol_config.en_dyn_ack = false;
+	nrf24_protocol_config.en_dyn_payload_size = false;
 	nrf24_setup_protocol(&nrf24_lower_api_config, &nrf24_protocol_config);
 
 	//настройка пайпа(штука , чтобы принимать)
 	nrf24_pipe_config_t pipe_config;
 	pipe_config.address = 0xafafafaf01;
 	pipe_config.enable_auto_ack = true;
-	pipe_config.payload_size = -1;
+	pipe_config.payload_size = 32;
 	nrf24_pipe_rx_start(&nrf24_lower_api_config, 0, &pipe_config);
-	uint16_t num = 0;
+
+	for (int i = 1; i < 6; i++)
+	{
+		pipe_config.address = 0xcfcfcfcfcf;
+		pipe_config.address = (pipe_config.address & ~((uint64_t)0xff << 32)) | ((uint64_t)i << 32);
+		pipe_config.enable_auto_ack = true;
+		pipe_config.payload_size = 32;
+		nrf24_pipe_rx_start(&nrf24_lower_api_config, i, &pipe_config);
+	}
+
+	nrf24_pipe_set_tx_addr(&nrf24_lower_api_config, 0xafafafaf01);
 
 	nrf24_mode_standby(&nrf24_lower_api_config);
 
@@ -302,6 +314,8 @@ int app_main()
 	float height_on_BME280 = 0;
 	while(true)
 	{
+		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
+
 		dump_registers(&nrf24_lower_api_config);
 
 		comp_data = bme_read_data(&bme);
@@ -310,6 +324,11 @@ int app_main()
 		packet_da_type_1.BME280_humidity = (uint16_t)comp_data.humidity;
 
 		height_on_BME280 = 44330*(1 - pow((float)packet_da_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
+
+		if (height_on_BME280 <= 200)
+		{
+			bzr_on();
+		}
 
 		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
 
@@ -331,9 +350,10 @@ int app_main()
 		packet_da_type_1.time = HAL_GetTick();
 		packet_da_type_2.time = HAL_GetTick();
 
-		packet_da_type_1.num = num;
-		packet_da_type_2.num = num;
-		num++;
+		packet_da_type_1.num = packet_num_1;
+		packet_da_type_2.num = packet_num_2;
+		packet_num_1++;
+		packet_num_2++;
 
 		packet_da_type_1.sum = Crc16((uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1) - 2);
 		packet_da_type_2.sum = Crc16((uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2) - 2);
@@ -358,7 +378,7 @@ int app_main()
 			nrf24_fifo_flush_rx(&nrf24_lower_api_config);
 		}
 
-		if (rx_status != NRF24_FIFO_NOT_EMPTY || HAL_GetTick() - time_nrf_start >= 1000)
+		if (tx_status == NRF24_FIFO_EMPTY || HAL_GetTick() - time_nrf_start >= 1000)
 		{
 			time_nrf_start = HAL_GetTick();
 			if (radio_flag)
