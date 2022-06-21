@@ -15,7 +15,7 @@
 #include "fatfs.h"
 #include <stm32f1xx_hal.h>
 
-
+#define DA_NUM 1
 
 extern UART_HandleTypeDef huart3;
 
@@ -64,6 +64,7 @@ static reg_param_t reg_params[] = {
 typedef struct
 {
 	uint8_t flag;
+	uint8_t da_num;
 	uint16_t num;
 	uint32_t time;
 
@@ -83,6 +84,7 @@ typedef struct
 typedef struct
 {
 	uint8_t flag;
+	uint8_t da_num;
 	uint16_t num;
 	uint32_t time;
 
@@ -241,6 +243,9 @@ int app_main()
 	packet_da_type_1.flag = 0xfa;
 	packet_da_type_2.flag = 0xfb;
 
+	packet_da_type_1.da_num = DA_NUM;
+	packet_da_type_2.da_num = DA_NUM;
+
 	nrf24_spi_pins_t nrf24_spi_pins;
 	nrf24_spi_pins.ce_port = GPIOA;
 	nrf24_spi_pins.ce_pin = GPIO_PIN_8;
@@ -274,6 +279,7 @@ int app_main()
 	//настройка пайпа(штука , чтобы принимать)
 	nrf24_pipe_config_t pipe_config;
 	pipe_config.address = 0xafafafaf01;
+	pipe_config.address = (pipe_config.address & ~((uint64_t)0xff << 32)) | ((uint64_t)DA_NUM << 32);
 	pipe_config.enable_auto_ack = true;
 	pipe_config.payload_size = 32;
 	nrf24_pipe_rx_start(&nrf24_lower_api_config, 0, &pipe_config);
