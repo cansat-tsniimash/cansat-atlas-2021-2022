@@ -393,7 +393,6 @@ int app_main()
 		if (res != FR_OK) led_sens_off(&shift_reg_sens, 8, 1);
 		else led_sens_on(&shift_reg_sens, 8, 1);
 
-		led_nrf_change(&shift_reg_nrf, 7, 1);
 
         counter++;
 
