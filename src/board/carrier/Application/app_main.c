@@ -18,6 +18,7 @@
 #include "LIS3MDL/DLIS3.h"
 #include "1Wire_DS18B20/one_wire.h"
 #include "buzzer.h"
+#include "led.h"
 
 #define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
 #define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
@@ -40,7 +41,8 @@ typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
 	STATE_BUILD_PACKET_TO_DA_1,
 	STATE_SEND,
 	STATE_WRITE_DA_PACKET_TO_GCS,
-	STATE_BUILD_PACKET_TO_DA_2
+	STATE_BUILD_PACKET_TO_DA_2,
+	STATE_BUILD_PACKET_TO_DA_3
 }nrf24_state_t;
 
 typedef enum//ОПИСЫВАЕМ СОСТОЯНИЕ ПОЛЕТА
@@ -355,6 +357,7 @@ int app_main()
     size_t packet_size;
     uint8_t state_sd = 88;
     uint16_t timer_sync_start = HAL_GetTick();
+    uint32_t counter = 0;
 
     uint32_t send_to_gcs_start_time = 0;
 	//motor_on();
@@ -384,9 +387,18 @@ int app_main()
 
 	start_time_ds = HAL_GetTick();
 	ds18b20_start_conversion(&ds18b20);
+	led_sens_on(&shift_reg_sens, 10, 1);
 	while(1)
 	{
+		if (res != FR_OK) led_sens_off(&shift_reg_sens, 8, 1);
+		else led_sens_on(&shift_reg_sens, 8, 1);
 
+		led_nrf_change(&shift_reg_nrf, 7, 1);
+
+        counter++;
+
+        if(counter % 50 == 0) led_sens_change(&shift_reg_sens, 12, 1);
+        if (packet_ma_type_1.fix >= 1) led_sens_on(&shift_reg_sens, 11, 1);
 
 		comp_data = bme_read_data(&bme);
 		packet_ma_type_1.BME280_pressure = (float)comp_data.pressure;
@@ -449,6 +461,7 @@ int app_main()
 			{
 				if (HAL_GetTick() >= start_time_io + 50)
 				{
+					led_sens_change(&shift_reg_sens, 10, 1);
 					lux_sun = photorezistor_get_lux(photoresistor);
 					state_now = STATE_ON_GROUND;
 					start_time_io = HAL_GetTick();
@@ -465,6 +478,7 @@ int app_main()
 			{
 				if (HAL_GetTick() >= start_time_io + 50)
 				{
+					led_sens_change(&shift_reg_sens, 10, 1);
 					start_time = HAL_GetTick();
 					state_now = STATE_WAIT;
 				}
@@ -478,6 +492,7 @@ int app_main()
 		case STATE_WAIT:
 		    if(HAL_GetTick() > start_time + TIME_WAIT_BTN_PHOTOREZ)
 		    {
+		    	led_sens_change(&shift_reg_sens, 10, 1);
 				state_now = STATE_IN_RN;
 				lux_rn = photorezistor_get_lux(photoresistor);
 		    }
@@ -489,6 +504,7 @@ int app_main()
 			packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
 			if ((lux_sun-lux_rn)*KOF < packet_ma_type_2.phortsistor-lux_rn)
 			{
+				led_sens_change(&shift_reg_sens, 10, 1);
 				state_now = STATE_AFTER_SEPARATION;
 			}
 			break;
@@ -496,6 +512,7 @@ int app_main()
 		case STATE_AFTER_SEPARATION:
 			if (HEIGHT_SEPARATION >= height_on_BME280)
 			{
+				led_sens_change(&shift_reg_sens, 10, 1);
 				state_now = STATE_MINOR_DEVICE_SEPARATION;
 			}
 			break;
@@ -505,6 +522,7 @@ int app_main()
 			start_time = HAL_GetTick();
 			if (check_out_motor_trigger() == true || (HAL_GetTick() - start_time) > MOTOR_TIMEOUT)
 			{
+				led_sens_change(&shift_reg_sens, 10, 1);
 				motor_off();
 				state_now = STATE_SEPARATED;
 			}
@@ -594,6 +612,7 @@ int app_main()
 	        	packet_size = nrf24_fifo_read(&nrf24_api_config, da_1_rx_buffer, sizeof(da_1_rx_buffer));
 	        	if (packet_size > 0)
 				{
+	        		led_nrf_change(&shift_reg_nrf, 7, 1);
 					nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
 					nrf24_fifo_write(&nrf24_api_config, (uint8_t *)da_1_rx_buffer, packet_size, false);
 					res = f_write (&testFile, (uint8_t *)da_1_rx_buffer, packet_size, &bw);
@@ -608,7 +627,16 @@ int app_main()
 				break;
 
 	        case STATE_BUILD_PACKET_TO_DA_2:
-	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
+	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf02);
+			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), true);
+                state_in_send_true = STATE_WRITE_DA_PACKET_TO_GCS;
+                state_in_send_false = STATE_BUILD_PACKET_TO_DA_3;
+			    nrf24_state_now = STATE_SEND;
+			    send_to_gcs_start_time = HAL_GetTick();
+			    break;
+
+	        case STATE_BUILD_PACKET_TO_DA_3:
+	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf03);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), true);
                 state_in_send_true = STATE_WRITE_DA_PACKET_TO_GCS;
                 state_in_send_false = STATE_BUILD_PACKET_MA_1_TO_GCS;
@@ -619,11 +647,12 @@ int app_main()
 	    }
         if(HAL_GetTick() - timer_sync_start >= 2000 && res == FR_OK)
         {
-        	f_sync(&testFile);
-        	f_sync(&bme_hei_file);
+        	res = f_sync(&testFile);
+        	res = f_sync(&bme_hei_file);
         	timer_sync_start = HAL_GetTick();
         }
 	}
+
 	return 0;
     }
 
