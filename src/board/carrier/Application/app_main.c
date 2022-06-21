@@ -589,6 +589,12 @@ int app_main()
 		            	nrf24_state_now = state_in_send_false;
 		            	break;
 					}
+	        		else if (comp & NRF24_IRQ_RX_DR)
+					{
+		            	nrf24_fifo_flush_tx(&nrf24_api_config);
+		            	nrf24_state_now = state_in_send_true;
+		            	break;
+					}
 	            }
 	            if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
 	            {
@@ -612,6 +618,7 @@ int app_main()
 	        	if (packet_size > 0)
 				{
 	        		led_nrf_change(&shift_reg_nrf, 7, 1);
+	        		nrf24_fifo_flush_tx(&nrf24_api_config);
 					nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
 					nrf24_fifo_write(&nrf24_api_config, (uint8_t *)da_1_rx_buffer, packet_size, false);
 					res = f_write (&testFile, (uint8_t *)da_1_rx_buffer, packet_size, &bw);
