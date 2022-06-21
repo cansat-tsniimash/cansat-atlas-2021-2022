@@ -5,10 +5,10 @@
 
 void bzr_on ()
 {
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10,  GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1,  GPIO_PIN_SET);
 }
 
 void bzr_off ()
 {
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10,  GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1,  GPIO_PIN_RESET);
 }

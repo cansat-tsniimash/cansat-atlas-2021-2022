@@ -14,6 +14,7 @@
 #include "../stm32f1/LSM6DS3/DLSM.h"
 #include "fatfs.h"
 #include <stm32f1xx_hal.h>
+#include "buzzer.h"
 
 #define DA_NUM 1
 
@@ -279,7 +280,7 @@ int app_main()
 	//настройка пайпа(штука , чтобы принимать)
 	nrf24_pipe_config_t pipe_config;
 	pipe_config.address = 0xafafafaf01;
-	pipe_config.address = (pipe_config.address & ~((uint64_t)0xff << 32)) | ((uint64_t)DA_NUM << 32);
+	pipe_config.address = (pipe_config.address & ~((uint64_t)0xff)) | ((uint64_t)DA_NUM);
 	pipe_config.enable_auto_ack = true;
 	pipe_config.payload_size = 32;
 	nrf24_pipe_rx_start(&nrf24_lower_api_config, 0, &pipe_config);
@@ -316,38 +317,38 @@ int app_main()
     uint16_t packet_num_1 = 0;
     uint16_t packet_num_2 = 0;
     int fix2;
+    uint32_t counter;
+    uint8_t state_height = 0;
 
 	float height_on_BME280 = 0;
 	while(true)
 	{
-		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
-
-		dump_registers(&nrf24_lower_api_config);
+		gps_work();
+		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height, &fix2);
+		packet_da_type_2.fix = (uint8_t)fix2;
 
 		comp_data = bme_read_data(&bme);
 		packet_da_type_1.BME280_pressure = (uint32_t)comp_data.pressure;
 		packet_da_type_1.BME280_temperature = (int16_t)(comp_data.temperature*100);
 		packet_da_type_1.BME280_humidity = (uint16_t)comp_data.humidity;
 
+
+
 		height_on_BME280 = 44330*(1 - pow((float)packet_da_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
 
-		if (height_on_BME280 <= 200)
-		{
-			bzr_on();
-		}
+		if (state_height == 0 && height_on_BME280 > 500) state_height = 1;
+		counter++;
+		if (counter  % 50 == 0) HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
+
+		dump_registers(&nrf24_lower_api_config);
+
+		if (height_on_BME280 <= 200 && state_height == 1) bzr_on();
 
 		lsmread(&stmdev_ctx, &temperature_celsius_gyro, &acc_g, &gyro_dps);
 
-		for (int i= 0; i < 3 ; i++)
-		{
-			packet_da_type_1.LSM6DSL_accelerometer[i] = (int16_t)(acc_g[i]*1000);
-		}
+		for (int i= 0; i < 3 ; i++) packet_da_type_1.LSM6DSL_accelerometer[i] = (int16_t)(acc_g[i]*1000);
+		for (int i= 0; i < 3 ; i++) packet_da_type_1. LSM6DSL_gyroscope[i] = (int16_t)(gyro_dps[i]*1000);
 
-		for (int i= 0; i < 3 ; i++)
-		{
-			packet_da_type_1. LSM6DSL_gyroscope[i] = (int16_t)(gyro_dps[i]*1000);
-
-		}
 
 		gps_work();
 		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height, &fix2);
