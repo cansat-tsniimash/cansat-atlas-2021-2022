@@ -70,7 +70,7 @@ typedef struct
 	uint32_t time;
 
 	uint32_t BME280_pressure;
-	uint8_t BME280_temperature;
+	int16_t BME280_temperature;
 	uint16_t BME280_humidity;
 
 	int16_t LSM6DSL_accelerometer[3];
