@@ -1,4 +1,5 @@
 #include <stm32f1xx_hal.h>
+#include "buzzer.h"
 
 #define BZR_PORT GPIOB
 #define BZR_PIN GPIO_PIN_1

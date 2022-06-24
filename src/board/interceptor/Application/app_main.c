@@ -198,6 +198,7 @@ unsigned short Crc16(unsigned char *buf, unsigned short len) {
 
 int app_main()
 {
+	bzr_off();
 	uint16_t timer_sync_start = HAL_GetTick();
     uint8_t state_sd = 88;
 
