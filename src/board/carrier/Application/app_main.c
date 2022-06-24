@@ -274,7 +274,7 @@ int app_main()
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
 	nrf24_rf_config.rf_channel = 100;
-	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_18_DBM;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
 	nrf24_setup_rf(&nrf24_api_config, &nrf24_rf_config);
 
 	// Настроили протокол
@@ -326,7 +326,7 @@ int app_main()
 	packet_ma_type_2_t packet_ma_type_2 = {0};
 	packet_ma_type_1.flag = 0xff;
 	packet_ma_type_2.flag = 0xfe;
-	uint8_t da_1_rx_buffer[32];
+	uint8_t da_1_rx_buffer[32] = {0};
 	uint32_t start_time = 0;
 	state_t state_now = STATE_INIT;
 	nrf24_state_t nrf24_state_now = STATE_BUILD_PACKET_MA_1_TO_GCS;
@@ -538,6 +538,7 @@ int app_main()
 	    {
 
 	        case STATE_BUILD_PACKET_MA_1_TO_GCS:
+	        	nrf24_fifo_flush_tx(&nrf24_api_config);
 	        	packet_ma_type_1.time = HAL_GetTick();
 	            packet_num_1++;
 	        	packet_ma_type_1.num = packet_num_1;
@@ -557,6 +558,7 @@ int app_main()
 			    break;
 
 	        case STATE_BUILD_PACKET_MA_2_TO_GCS:
+	        	nrf24_fifo_flush_tx(&nrf24_api_config);
 	        	packet_ma_type_2.time = HAL_GetTick();
 	            packet_num_2++;
 	            packet_num_2++;
@@ -585,25 +587,23 @@ int app_main()
 					}
 	        		else if (comp & NRF24_IRQ_MAX_RT)
 					{
-		            	nrf24_fifo_flush_tx(&nrf24_api_config);
 		            	nrf24_state_now = state_in_send_false;
 		            	break;
 					}
 	        		else if (comp & NRF24_IRQ_RX_DR)
 					{
-		            	nrf24_fifo_flush_tx(&nrf24_api_config);
-		            	nrf24_state_now = state_in_send_true;
+		            	nrf24_state_now = state_in_send_false;
 		            	break;
 					}
 	            }
 	            if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
 	            {
-	            	nrf24_fifo_flush_tx(&nrf24_api_config);
 	            	nrf24_state_now = state_in_send_false;
 	            }
 	            break;
 
 	        case STATE_BUILD_PACKET_TO_DA_1 :
+	        	nrf24_fifo_flush_tx(&nrf24_api_config);
 	        	//printf("ДА, лови маслину\n");
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), true);
@@ -633,6 +633,7 @@ int app_main()
 				break;
 
 	        case STATE_BUILD_PACKET_TO_DA_2:
+	        	nrf24_fifo_flush_tx(&nrf24_api_config);
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf02);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), true);
                 state_in_send_true = STATE_WRITE_DA_PACKET_TO_GCS;
@@ -642,6 +643,7 @@ int app_main()
 			    break;
 
 	        case STATE_BUILD_PACKET_TO_DA_3:
+	        	nrf24_fifo_flush_tx(&nrf24_api_config);
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf03);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), true);
                 state_in_send_true = STATE_WRITE_DA_PACKET_TO_GCS;
