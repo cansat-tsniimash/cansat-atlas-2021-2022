@@ -9,7 +9,7 @@
 
 bool check_out_motor_trigger()
 {
-	if(HAL_GPIO_ReadPin(MOTOR_TRIGGER_PORT, MOTOR_TRIGGER_PIN) == GPIO_PIN_RESET)
+	if(HAL_GPIO_ReadPin(MOTOR_TRIGGER_PORT, MOTOR_TRIGGER_PIN) == GPIO_PIN_SET)
 		return true;
 	else
 		return false;

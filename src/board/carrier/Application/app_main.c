@@ -313,7 +313,7 @@ int app_main()
 	//заполнение структуры на фоторезистор
 	photorezistor_t photoresistor;
 	//сопротивление (R)
-	photoresistor.resist = 5100;
+	photoresistor.resist = 2000;
 	//hadc1 - дискриптор с начтройками АЦП
 	photoresistor.hadc = &hadc1;
 
