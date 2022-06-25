@@ -16,7 +16,7 @@
 #include <stm32f1xx_hal.h>
 #include "buzzer.h"
 
-#define DA_NUM 1
+#define DA_NUM 3
 
 extern UART_HandleTypeDef huart3;
 
@@ -264,7 +264,7 @@ int app_main()
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
 	nrf24_rf_config.rf_channel = 100;
-	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_18_DBM;
 	nrf24_setup_rf(&nrf24_lower_api_config, &nrf24_rf_config);
 
 	// Настроили протокол
@@ -285,17 +285,16 @@ int app_main()
 	pipe_config.enable_auto_ack = true;
 	pipe_config.payload_size = 32;
 	nrf24_pipe_rx_start(&nrf24_lower_api_config, 0, &pipe_config);
+	nrf24_pipe_set_tx_addr(&nrf24_lower_api_config, pipe_config.address);
 
 	for (int i = 1; i < 6; i++)
 	{
 		pipe_config.address = 0xcfcfcfcfcf;
-		pipe_config.address = (pipe_config.address & ~((uint64_t)0xff << 32)) | ((uint64_t)i << 32);
+		pipe_config.address = (pipe_config.address & ~((uint64_t)0xff << 32)) | ((uint64_t)(i + 7) << 32);
 		pipe_config.enable_auto_ack = true;
 		pipe_config.payload_size = 32;
 		nrf24_pipe_rx_start(&nrf24_lower_api_config, i, &pipe_config);
 	}
-
-	nrf24_pipe_set_tx_addr(&nrf24_lower_api_config, 0xafafafaf01);
 
 	nrf24_mode_standby(&nrf24_lower_api_config);
 
@@ -322,6 +321,8 @@ int app_main()
     uint8_t state_height = 0;
 
 	float height_on_BME280 = 0;
+	int count = 0;
+	int count1 = 0;
 	while(true)
 	{
 		gps_work();
@@ -382,25 +383,30 @@ int app_main()
 
 		if (rx_status != NRF24_FIFO_EMPTY)
 		{
+			count++;
 			nrf24_fifo_read(&nrf24_lower_api_config, rx_buffer, 32);
-			nrf24_fifo_flush_rx(&nrf24_lower_api_config);
+			if (rx_status == NRF24_FIFO_FULL)
+			{
+				nrf24_fifo_flush_rx(&nrf24_lower_api_config);
+			}
 		}
 
-		if (tx_status == NRF24_FIFO_EMPTY || HAL_GetTick() - time_nrf_start >= 1000)
+		if (tx_status == NRF24_FIFO_EMPTY)// || HAL_GetTick() - time_nrf_start >= 1000)
 		{
+			count1++;
 			time_nrf_start = HAL_GetTick();
 			if (radio_flag)
 			{
 				nrf24_fifo_flush_tx(&nrf24_lower_api_config);
 				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
-				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
+				//nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
 				radio_flag = !radio_flag;
 			}
 			else
 			{
 				nrf24_fifo_flush_tx(&nrf24_lower_api_config);
 				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
-				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
+				//nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
 				radio_flag = !radio_flag;
 			}
 		}
