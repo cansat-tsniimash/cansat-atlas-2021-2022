@@ -274,7 +274,7 @@ int app_main()
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
 	nrf24_rf_config.rf_channel = 100;
-	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_18_DBM;
 	nrf24_setup_rf(&nrf24_api_config, &nrf24_rf_config);
 
 	// Настроили протокол
@@ -292,19 +292,19 @@ int app_main()
 
 	//настройка пайпа(штука , чтобы принимать)
 	nrf24_pipe_config_t pipe_config;
-	pipe_config.address = 0xafafafaf01;
-	pipe_config.enable_auto_ack = true;
-	pipe_config.payload_size = 32;
-	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
-
 	for (int i = 1; i < 6; i++)
 	{
 		pipe_config.address = 0xcfcfcfcfcf;
-		pipe_config.address = (pipe_config.address & ~((uint64_t)0xff << 32)) | ((uint64_t)i << 32);
+		pipe_config.address = (pipe_config.address & ~((uint64_t)0xff << 32)) | ((uint64_t)(i + 7) << 32);
 		pipe_config.enable_auto_ack = true;
 		pipe_config.payload_size = 32;
 		nrf24_pipe_rx_start(&nrf24_api_config, i, &pipe_config);
 	}
+
+	pipe_config.address = 0xafafafaf01;
+	pipe_config.enable_auto_ack = true;
+	pipe_config.payload_size = 32;
+	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
 
 	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
 
@@ -388,6 +388,9 @@ int app_main()
 	start_time_ds = HAL_GetTick();
 	ds18b20_start_conversion(&ds18b20);
 	led_sens_on(&shift_reg_sens, 10, 1);
+	int count = 0;
+	int count1 = 0;
+	int count2 = 0;
 	while(1)
 	{
 		if (res != FR_OK) led_sens_off(&shift_reg_sens, 8, 1);
@@ -590,11 +593,6 @@ int app_main()
 		            	nrf24_state_now = state_in_send_false;
 		            	break;
 					}
-	        		else if (comp & NRF24_IRQ_RX_DR)
-					{
-		            	nrf24_state_now = state_in_send_false;
-		            	break;
-					}
 	            }
 	            if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_TIMEOUT))
 	            {
@@ -604,8 +602,9 @@ int app_main()
 
 	        case STATE_BUILD_PACKET_TO_DA_1 :
 	        	nrf24_fifo_flush_tx(&nrf24_api_config);
-	        	//printf("ДА, лови маслину\n");
-	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf01);
+	        	pipe_config.address = 0xafafafaf01;
+	        	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
+	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, pipe_config.address);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), true);
                 state_in_send_true = STATE_WRITE_DA_PACKET_TO_GCS;
                 state_in_send_false = STATE_BUILD_PACKET_TO_DA_2;
@@ -615,13 +614,18 @@ int app_main()
 
 	        case STATE_WRITE_DA_PACKET_TO_GCS :
 	        	packet_size = nrf24_fifo_read(&nrf24_api_config, da_1_rx_buffer, sizeof(da_1_rx_buffer));
+	        	count1++;
 	        	if (packet_size > 0)
 				{
+	        		count++;
 	        		led_nrf_change(&shift_reg_nrf, 7, 1);
 	        		nrf24_fifo_flush_tx(&nrf24_api_config);
 					nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
 					nrf24_fifo_write(&nrf24_api_config, (uint8_t *)da_1_rx_buffer, packet_size, false);
-					res = f_write (&testFile, (uint8_t *)da_1_rx_buffer, packet_size, &bw);
+					if(state_sd == FR_OK)
+					{
+						res = f_write (&testFile, (uint8_t *)da_1_rx_buffer, packet_size, &bw);
+					}
 					send_to_gcs_start_time = HAL_GetTick();
 					state_in_send_true = state_in_send_false;
 					nrf24_state_now = STATE_SEND;
@@ -634,8 +638,10 @@ int app_main()
 
 	        case STATE_BUILD_PACKET_TO_DA_2:
 	        	nrf24_fifo_flush_tx(&nrf24_api_config);
-	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf02);
-			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), true);
+	        	pipe_config.address = 0xafafafaf02;
+	        	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
+	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, pipe_config.address);
+			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), true);
                 state_in_send_true = STATE_WRITE_DA_PACKET_TO_GCS;
                 state_in_send_false = STATE_BUILD_PACKET_TO_DA_3;
 			    nrf24_state_now = STATE_SEND;
@@ -643,9 +649,12 @@ int app_main()
 			    break;
 
 	        case STATE_BUILD_PACKET_TO_DA_3:
+	        	count2++;
 	        	nrf24_fifo_flush_tx(&nrf24_api_config);
-	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0xafafafaf03);
-			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), true);
+	        	pipe_config.address = 0xafafafaf03;
+	        	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
+	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, pipe_config.address);
+			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), true);
                 state_in_send_true = STATE_WRITE_DA_PACKET_TO_GCS;
                 state_in_send_false = STATE_BUILD_PACKET_MA_1_TO_GCS;
 			    nrf24_state_now = STATE_SEND;
@@ -653,7 +662,7 @@ int app_main()
 			    break;
 
 	    }
-        if(HAL_GetTick() - timer_sync_start >= 2000 && res == FR_OK)
+        if(HAL_GetTick() - timer_sync_start >= 2000 && state_sd == FR_OK)
         {
         	res = f_sync(&testFile);
         	res = f_sync(&bme_hei_file);
