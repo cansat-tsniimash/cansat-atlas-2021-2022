@@ -28,9 +28,59 @@ float read_float(const char* data)
     return retval;
 }
 
+unsigned short pars_packet_1_to_da(unsigned char* buf, size_t len, std::ofstream* fout_da_type_1)
+{
+                std::cout << "num:" << (uint16_t)((buf_byte_pack_da_1[3] << 8) | buf_byte_pack_da_1[2]) << std::endl;
+                std::cout << "time:" << (uint32_t)((buf_byte_pack_da_1[7] << 24) | (buf_byte_pack_da_1[6] << 16) | (buf_byte_pack_da_1[5] << 8) | buf_byte_pack_da_1[4]) << std::endl;
+
+                std::cout << "bme_pres:" << (uint32_t)((buf_byte_pack_da_1[11] << 24) | (buf_byte_pack_da_1[10] << 16) | (buf_byte_pack_da_1[9] << 8) | buf_byte_pack_da_1[8]) << std::endl;
+                std::cout << "bme_temp:" << buf_byte_pack_da_1[12];
+                std::cout << "bme_hum:" << (uint16_t)((buf_byte_pack2[14] << 8) | buf_byte_pack_da_1[13]) << std::endl;
+
+                std::cout << "lsm_ac:" << (uint16_t)((buf_byte_pack_da_1[16] << 8) | buf_byte_pack_da_1[15]) << std::endl;
+                std::cout << ":" << (uint16_t)((buf_byte_pack_da_1[18] << 8) | buf_byte_pack_da_1[17]) << std::endl;
+                std::cout << ":" << (uint16_t)((buf_byte_pack_da_1[20] << 8) | buf_byte_pack_da_1[19]) << std::endl;
+
+                std::cout << "lsm_gyro:" << (uint16_t)((buf_byte_pack_da_1[22] << 8) | buf_byte_pack_da_1[23]) << std::endl;
+                std::cout << ":" << (uint16_t)((buf_byte_pack_da_1[24] << 8) | buf_byte_pack_da_1[23]) << std::endl;
+                std::cout << ":" << (uint16_t)((buf_byte_pack2[26] << 8) | buf_byte_pack_da_1[25]) << std::endl;
+
+                *fout_da_type_1 << (uint16_t)((buf_byte_pack2[3] << 8) | buf_byte_pack_da_1[2]) << ",";
+                *fout_da_type_1 << (uint32_t)((buf_byte_pack_da_1[7] << 24) | (buf_byte_pack_da_1[6] << 16) | (buf_byte_pack_da_1[5] << 8) | buf_byte_pack_da_1[4]) << ",";
+                *fout_da_type_1 << (uint32_t)((buf_byte_pack_da_1[11] << 24) | (buf_byte_pack_da_1[10] << 16) | (buf_byte_pack_da_1[9] << 8) | buf_byte_pack_da_1[8]) << ",";
+                *fout_da_type_1 << (int)buf_byte_pack_da_1[12] << ",";
+                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[14] << 8) | buf_byte_pack_da_1[13]) << ",";
+                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[16] << 8) | buf_byte_pack_da_1[15]) << ",";
+                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[18] << 8) | buf_byte_pack_da_1[17]) << ",";
+                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[20] << 8) | buf_byte_pack_da_1[19]) << ",";
+                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[22] << 8) | buf_byte_pack_da_1[21]) << ",";
+                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[24] << 8) | buf_byte_pack_da_1[23]) << ",";
+                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[26] << 8) | buf_byte_pack_da_1[25]) << std::endl;
+}
+
+unsigned short pars_packet_2_to_da(unsigned char* buf, size_t len, std::ofstream* fout_da_type_2)
+{
+                    std::cout << "num:" << (uint16_t)((buf_byte_pack_da_2[3] << 8) | buf_byte_pack_da_2[2]) << std::endl;
+                    std::cout << "time:" << (uint32_t)((buf_byte_pack_da_2[7] << 24) | (buf_byte_pack_da_2[6] << 16) | (buf_byte_pack_da_2[5] << 8) | buf_byte_pack_da_2[4]) << std::endl;
+
+                    std::cout << read_float((const char*)&buf_byte_pack_da_2[8]) << std::endl;
+                    std::cout << read_float((const char*)&buf_byte_pack_da_2[12]) << std::endl;
+                    std::cout << read_float((const char*)&buf_byte_pack_da_2[16]) << std::endl;
+
+                    std::cout << "fix" << (uint8_t)(buf_byte_pack_da_2[20]) << std::endl;
+                    std::cout << "fstate" << (uint8_t)(buf_byte_pack_da_2[21]) << std::endl;
+
+                    *fout_da_type_2 << (uint16_t)((buf_byte_pack_da_2[3] << 8) | buf_byte_pack_da_2[2]) << ",";
+                    *fout_da_type_2 << (uint32_t)((buf_byte_pack_da_2[7] << 24) | (buf_byte_pack_da_2[6] << 16) | (buf_byte_pack_da_2[5] << 8) | buf_byte_pack_da_2[4]) << ",";
+                    *fout_da_type_2 << read_float((const char*)&buf_byte_pack_da_2[8])<< ",";
+                    *fout_da_type_2 << read_float((const char*)&buf_byte_pack_da_2[12]) << ",";
+                    *fout_da_type_2 << read_float((const char*)&buf_byte_pack_da_2[16) << ",";
+                    *fout_da_type_2 << (int)(buf_byte_pack_da_2[20]) << ",";
+                    *fout_da_type_2 << (int)(buf_byte_pack_da_2[21]) << std::endl;
+}
 
 
-unsigned short pars_b(unsigned char* buf, size_t len, std::ofstream* fout_ma_type_1, std::ofstream* fout_ma_type_2, std::ofstream* fout_da_type_1, std::ofstream* fout_da_type_2)
+unsigned short pars_b(unsigned char* buf, size_t len, std::ofstream* fout_ma_type_1, std::ofstream* fout_ma_type_2, std::ofstream* fout_da_1_type_1, std::ofstream* fout_da_1_type_2, std::ofstream* fout_da_2_type_1, std::ofstream* fout_da_2_type_2, std::ofstream* fout_da_3_type_1, std::ofstream* fout_da_3_type_2)
 {
     for (size_t i = 0; i < len; i++)
     {
@@ -125,60 +175,28 @@ unsigned short pars_b(unsigned char* buf, size_t len, std::ofstream* fout_ma_typ
             const uint16_t actual = Crc16((unsigned char*)&buf_byte_pack_da_1, 26);
             if (actual == expected) 
             {
-                std::cout << "num:" << (uint16_t)((buf_byte_pack_da_1[2] << 8) | buf_byte_pack_da_1[1]) << std::endl;
-                std::cout << "time:" << (uint32_t)((buf_byte_pack_da_1[6] << 24) | (buf_byte_pack_da_1[5] << 16) | (buf_byte_pack_da_1[4] << 8) | buf_byte_pack_da_1[3]) << std::endl;
-
-                std::cout << "bme_pres:" << (uint32_t)((buf_byte_pack_da_1[10] << 24) | (buf_byte_pack_da_1[9] << 16) | (buf_byte_pack_da_1[8] << 8) | buf_byte_pack_da_1[7]) << std::endl;
-                std::cout << "bme_temp:" << buf_byte_pack_da_1[11];
-                std::cout << "bme_hum:" << (uint16_t)((buf_byte_pack2[13] << 8) | buf_byte_pack_da_1[12]) << std::endl;
-
-                std::cout << "lsm_ac:" << (uint16_t)((buf_byte_pack_da_1[15] << 8) | buf_byte_pack_da_1[14]) << std::endl;
-                std::cout << ":" << (uint16_t)((buf_byte_pack_da_1[17] << 8) | buf_byte_pack_da_1[16]) << std::endl;
-                std::cout << ":" << (uint16_t)((buf_byte_pack_da_1[19] << 8) | buf_byte_pack_da_1[18]) << std::endl;
-
-                std::cout << "lsm_gyro:" << (uint16_t)((buf_byte_pack_da_1[21] << 8) | buf_byte_pack_da_1[20]) << std::endl;
-                std::cout << ":" << (uint16_t)((buf_byte_pack_da_1[23] << 8) | buf_byte_pack_da_1[22]) << std::endl;
-                std::cout << ":" << (uint16_t)((buf_byte_pack2[25] << 8) | buf_byte_pack_da_1[24]) << std::endl;
-
-                *fout_da_type_1 << (uint16_t)((buf_byte_pack2[2] << 8) | buf_byte_pack_da_1[1]) << ",";
-                *fout_da_type_1 << (uint32_t)((buf_byte_pack_da_1[6] << 24) | (buf_byte_pack_da_1[5] << 16) | (buf_byte_pack_da_1[4] << 8) | buf_byte_pack_da_1[3]) << ",";
-                *fout_da_type_1 << (uint32_t)((buf_byte_pack_da_1[10] << 24) | (buf_byte_pack_da_1[9] << 16) | (buf_byte_pack_da_1[8] << 8) | buf_byte_pack_da_1[7]) << ",";
-                *fout_da_type_1 << (int)buf_byte_pack_da_1[11] << ",";
-                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[13] << 8) | buf_byte_pack_da_1[12]) << ",";
-                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[15] << 8) | buf_byte_pack_da_1[14]) << ",";
-                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[17] << 8) | buf_byte_pack_da_1[16]) << ",";
-                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[19] << 8) | buf_byte_pack_da_1[18]) << ",";
-                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[21] << 8) | buf_byte_pack_da_1[20]) << ",";
-                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[23] << 8) | buf_byte_pack_da_1[22]) << ",";
-                *fout_da_type_1 << (uint16_t)((buf_byte_pack_da_1[25] << 8) | buf_byte_pack_da_1[24]) << std::endl;
+                if(1 == (uint16_t)((buf_byte_pack_da_2[3] << 8) | buf_byte_pack_da_2[2])) pars_packet_1_to_da(&buf_byte_pack_da_1, sizeof(buf_byte_pack_da_1), &fout_da_1_type_1);
+                if(2 == (uint16_t)((buf_byte_pack_da_2[3] << 8) | buf_byte_pack_da_2[2])) pars_packet_1_to_da(&buf_byte_pack_da_1, sizeof(buf_byte_pack_da_1), &fout_da_2_type_1);
+                if(3 == (uint16_t)((buf_byte_pack_da_2[3] << 8) | buf_byte_pack_da_2[2])) pars_packet_1_to_da(&buf_byte_pack_da_1, sizeof(buf_byte_pack_da_1), &fout_da_3_type_1);
             }
         }
 
 
         if (buf[i] == 0xfb && i + 22 < len)
         {
-            for (size_t j = 0; j < 23; j++) buf_byte_pack_da_2[j] = buf[j + i];
-            const uint16_t expected = ((uint16_t)buf_byte_pack_da_2[22] << 8) | (buf_byte_pack_da_2[21]);
-            const uint16_t actual = Crc16((unsigned char*)&buf_byte_pack_da_2, 21);
-            if (actual == expected) 
+            if (buf[i + 1] == 1 && i + 22 < len)
             {
-                std::cout << "num:" << (uint16_t)((buf_byte_pack_da_2[2] << 8) | buf_byte_pack_da_2[1]) << std::endl;
-                std::cout << "time:" << (uint32_t)((buf_byte_pack_da_2[6] << 24) | (buf_byte_pack_da_2[5] << 16) | (buf_byte_pack_da_2[4] << 8) | buf_byte_pack_da_2[3]) << std::endl;
 
-                std::cout << read_float((const char*)&buf_byte_pack_da_2[7]) << std::endl;
-                std::cout << read_float((const char*)&buf_byte_pack_da_2[11]) << std::endl;
-                std::cout << read_float((const char*)&buf_byte_pack_da_2[15]) << std::endl;
-
-                std::cout << "fix" << (uint8_t)(buf_byte_pack_da_2[19]) << std::endl;
-                std::cout << "fstate" << (uint8_t)(buf_byte_pack_da_2[20]) << std::endl;
-
-                *fout_da_type_2 << (uint16_t)((buf_byte_pack_da_2[2] << 8) | buf_byte_pack_da_2[1]) << ",";
-                *fout_da_type_2 << (uint32_t)((buf_byte_pack_da_2[6] << 24) | (buf_byte_pack_da_2[5] << 16) | (buf_byte_pack_da_2[4] << 8) | buf_byte_pack_da_2[3]) << ",";
-                *fout_da_type_2 << read_float((const char*)&buf_byte_pack_da_2[7])<< ",";
-                *fout_da_type_2 << read_float((const char*)&buf_byte_pack_da_2[11]) << ",";
-                *fout_da_type_2 << read_float((const char*)&buf_byte_pack_da_2[15]) << ",";
-                *fout_da_type_2 << (int)(buf_byte_pack_da_2[19]) << ",";
-                *fout_da_type_2 << (int)(buf_byte_pack_da_2[20]) << std::endl;
+            
+                for (size_t j = 0; j < 23; j++) buf_byte_pack_da_2[j] = buf[j + i];
+                const uint16_t expected = ((uint16_t)buf_byte_pack_da_2[22] << 8) | (buf_byte_pack_da_2[21]);
+                const uint16_t actual = Crc16((unsigned char*)&buf_byte_pack_da_2, 21);
+                if (actual == expected) 
+                {
+                if(1 == (uint16_t)((buf_byte_pack_da_2[3] << 8) | buf_byte_pack_da_2[2])) pars_packet_2_to_da(&buf_byte_pack_da_2, sizeof(buf_byte_pack_da_2), &fout_da_1_type_1);
+                if(2 == (uint16_t)((buf_byte_pack_da_2[3] << 8) | buf_byte_pack_da_2[2])) pars_packet_2_to_da(&buf_byte_pack_da_2, sizeof(buf_byte_pack_da_2), &fout_da_2_type_1);
+                if(3 == (uint16_t)((buf_byte_pack_da_2[3] << 8) | buf_byte_pack_da_2[2])) pars_packet_2_to_da(&buf_byte_pack_da_2, sizeof(buf_byte_pack_da_2), &fout_da_3_type_1);
+                }
 
             }
         }
@@ -194,8 +212,12 @@ int main()
     std::cout << "Hello World!\n";
     std::ofstream fout_ma_type_1("testfile_ma_type_1.csv", std::ios::out | std::ios::trunc);
     std::ofstream fout_ma_type_2("testfile_ma_type_2.csv", std::ios::out | std::ios::trunc);
-    std::ofstream fout_da_type_1("testfile_da_type_1.csv", std::ios::out | std::ios::trunc);
-    std::ofstream fout_da_type_2("testfile_da_type_2.csv", std::ios::out | std::ios::trunc);
+    std::ofstream fout_da_1_type_1("testfile_da_1_type_1.csv", std::ios::out | std::ios::trunc);
+    std::ofstream fout_da_1_type_2("testfile_da_1_type_2.csv", std::ios::out | std::ios::trunc);
+    std::ofstream fout_da_2_type_1("testfile_da_2_type_1.csv", std::ios::out | std::ios::trunc);
+    std::ofstream fout_da_2_type_2("testfile_da_2_type_2.csv", std::ios::out | std::ios::trunc);
+    std::ofstream fout_da_3_type_1("testfile_da_3_type_1.csv", std::ios::out | std::ios::trunc);
+    std::ofstream fout_da_3_type_2("testfile_da_3_type_2.csv", std::ios::out | std::ios::trunc);
     std::ifstream fin("testfile.bin", std::ios::binary | std::ios::in);
 
     while (1)
