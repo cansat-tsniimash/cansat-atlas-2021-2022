@@ -385,9 +385,6 @@ int app_main()
 		if (rx_status != NRF24_FIFO_EMPTY)
 		{
 			nrf24_fifo_read(&nrf24_lower_api_config, rx_buffer, 32);
-			bzr_on ();
-			HAL_Delay(1);
-			bzr_off ();
 			if (rx_status == NRF24_FIFO_FULL)
 			{
 				nrf24_fifo_flush_rx(&nrf24_lower_api_config);
