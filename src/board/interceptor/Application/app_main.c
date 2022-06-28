@@ -15,8 +15,9 @@
 #include "fatfs.h"
 #include <stm32f1xx_hal.h>
 #include "buzzer.h"
+#include "string.h"
 
-#define DA_NUM 3
+#define DA_NUM 1
 
 extern UART_HandleTypeDef huart3;
 
@@ -98,6 +99,7 @@ typedef struct
 
 	uint16_t sum;
 }packet_da_type_2_t;
+
 #pragma pack(pop)
 
 void print_bits(uint8_t value, char * buffer)
@@ -299,6 +301,7 @@ int app_main()
 	nrf24_mode_standby(&nrf24_lower_api_config);
 
 	uint8_t rx_buffer[32] = {0};
+	uint8_t tx_buffer[32] = {0};
 
 	nrf24_fifo_status_t rx_status = 0;
     nrf24_fifo_status_t tx_status = 0;
@@ -321,8 +324,6 @@ int app_main()
     uint8_t state_height = 0;
 
 	float height_on_BME280 = 0;
-	int count = 0;
-	int count1 = 0;
 	while(true)
 	{
 		gps_work();
@@ -383,30 +384,39 @@ int app_main()
 
 		if (rx_status != NRF24_FIFO_EMPTY)
 		{
-			count++;
 			nrf24_fifo_read(&nrf24_lower_api_config, rx_buffer, 32);
+			bzr_on ();
+			HAL_Delay(1);
+			bzr_off ();
 			if (rx_status == NRF24_FIFO_FULL)
 			{
 				nrf24_fifo_flush_rx(&nrf24_lower_api_config);
 			}
 		}
 
-		if (tx_status == NRF24_FIFO_EMPTY)// || HAL_GetTick() - time_nrf_start >= 1000)
+		if (tx_status == NRF24_FIFO_EMPTY || HAL_GetTick() - time_nrf_start >= 1000)
 		{
-			count1++;
 			time_nrf_start = HAL_GetTick();
 			if (radio_flag)
 			{
 				nrf24_fifo_flush_tx(&nrf24_lower_api_config);
-				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
-				//nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
+				memset(tx_buffer, 0x00, sizeof(tx_buffer));
+				memcpy(tx_buffer, &packet_da_type_1, sizeof(packet_da_type_1));
+				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0, tx_buffer, sizeof(tx_buffer));
+				memset(tx_buffer, 0x00, sizeof(tx_buffer));
+				memcpy(tx_buffer, &packet_da_type_2, sizeof(packet_da_type_2));
+				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0, tx_buffer, sizeof(tx_buffer));
 				radio_flag = !radio_flag;
 			}
 			else
 			{
 				nrf24_fifo_flush_tx(&nrf24_lower_api_config);
-				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2));
-				//nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0,(uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1));
+				memset(tx_buffer, 0x00, sizeof(tx_buffer));
+				memcpy(tx_buffer, &packet_da_type_2, sizeof(packet_da_type_2));
+				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0, tx_buffer, sizeof(tx_buffer));
+				memset(tx_buffer, 0x00, sizeof(tx_buffer));
+				memcpy(tx_buffer, &packet_da_type_1, sizeof(packet_da_type_1));
+				nrf24_fifo_write_ack_pld(&nrf24_lower_api_config, 0, tx_buffer, sizeof(tx_buffer));
 				radio_flag = !radio_flag;
 			}
 		}
