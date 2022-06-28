@@ -388,16 +388,10 @@ int app_main()
 	start_time_ds = HAL_GetTick();
 	ds18b20_start_conversion(&ds18b20);
 	led_sens_on(&shift_reg_sens, 10, 1);
-	int count = 0;
-	int count1 = 0;
-	int count2 = 0;
 	while(1)
 	{
 		if (res != FR_OK) led_sens_off(&shift_reg_sens, 8, 1);
 		else led_sens_on(&shift_reg_sens, 8, 1);
-
-
-        counter++;
 
         if(counter % 50 == 0) led_sens_change(&shift_reg_sens, 12, 1);
         if (packet_ma_type_1.fix >= 1) led_sens_on(&shift_reg_sens, 11, 1);
@@ -614,10 +608,8 @@ int app_main()
 
 	        case STATE_WRITE_DA_PACKET_TO_GCS :
 	        	packet_size = nrf24_fifo_read(&nrf24_api_config, da_1_rx_buffer, sizeof(da_1_rx_buffer));
-	        	count1++;
 	        	if (packet_size > 0)
 				{
-	        		count++;
 	        		led_nrf_change(&shift_reg_nrf, 7, 1);
 	        		nrf24_fifo_flush_tx(&nrf24_api_config);
 					nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
@@ -649,7 +641,6 @@ int app_main()
 			    break;
 
 	        case STATE_BUILD_PACKET_TO_DA_3:
-	        	count2++;
 	        	nrf24_fifo_flush_tx(&nrf24_api_config);
 	        	pipe_config.address = 0xafafafaf03;
 	        	nrf24_pipe_rx_start(&nrf24_api_config, 0, &pipe_config);
