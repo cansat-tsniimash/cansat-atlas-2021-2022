@@ -200,7 +200,55 @@ static void dump_registers(void *intf_ptr)
 	}
 }
 
+int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len)
+{
+	while(1)
+	{
+		static start_time;
+		static FATFS fileSystem; // переменная типа FATFS
+		static FIL testFile; // хендлер файла
+		static UINT bw;
+		static FRESULT res;
+		static int8_t state_sd = 0;
+		const char * path = "testFile.bin"; // название файла
+		const char * path1 = "bme_hei_file.csv"; // название файла
 
+		if(state_sd == 0)
+		{
+			led_sens_off(this, 8, 1);
+			FRESULT res = f_mount(&fileSystem, "", 1);
+			if(res == FR_OK){state_sd = 1;}
+			else return -1;
+		}
+		if(state_sd == 1)
+		{
+			led_sens_off(this, 8, 1);
+			res = f_open(&testFile, path, FA_WRITE | FA_OPEN_APPEND);
+			if(res == 0) state_sd = 2;
+			else
+			{
+				state_sd = 0;
+				res = f_mount(0, "", 1);
+			}
+		}
+		if (state_sd == 2)
+		{
+			led_sens_on(this, 8, 1);
+            f_write (&testFile,  (uint8_t *)buf, len, &bw);
+            if (HAL_GetTick() - start_time >= 750)
+            {
+            	res = f_sync(&testFile);
+                start_time  = HAL_GetTick();
+            }
+	        if (res == 0) return 0;
+            if (res != 0)
+            {
+    			res = f_close(&testFile);
+            	state_sd = 1;
+            }
+		}
+	}
+}
 
 unsigned short Crc16(unsigned char *buf, unsigned short len) {
 	unsigned short crc = 0xFFFF;
@@ -355,8 +403,6 @@ int app_main()
     uint8_t state_in_send_true;
     uint8_t state_in_send_false;
     size_t packet_size;
-    uint8_t state_sd = 88;
-    uint16_t timer_sync_start = HAL_GetTick();
     uint32_t counter = 0;
 
     uint32_t send_to_gcs_start_time = 0;
@@ -364,19 +410,7 @@ int app_main()
 
     lisset_sr(&lis3mdl_ctx, &lis_interface);
 
-	FATFS fileSystem; // переменная типа FATFS
-	FIL testFile, bme_hei_file; // хендлер файла
-    UINT bw; // количество символов, реально записанных внутрь файла
-	FRESULT res; // результат выполнения функции
 
-	if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
-		const char * path = "testFile.bin"; // название файла
-		res = f_open(&testFile, path,  FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
-		const char * path1 = "bme_hei_file.csv"; // название файла
-
-		res = f_open(&bme_hei_file, path1, FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
-
-	}
 
 	float height_on_BME280;
 	uint32_t pressure_on_ground;
@@ -390,8 +424,7 @@ int app_main()
 	led_sens_on(&shift_reg_sens, 10, 1);
 	while(1)
 	{
-		if (res != FR_OK) led_sens_off(&shift_reg_sens, 8, 1);
-		else led_sens_on(&shift_reg_sens, 8, 1);
+
 
         if(counter % 50 == 0) led_sens_change(&shift_reg_sens, 12, 1);
         if (packet_ma_type_1.fix >= 1) led_sens_on(&shift_reg_sens, 11, 1);
@@ -440,10 +473,6 @@ int app_main()
 
 		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
 
-		if(state_sd == FR_OK)
-		{
-			f_printf(&bme_hei_file, "%ld\n", (int32_t)(height_on_BME280*100));
-		}
 
 		printf("%d ", (int)cookie);
 		//кладем значение освещенности в поля пакета
@@ -530,46 +559,42 @@ int app_main()
 			break;
 		}
 
+    	packet_ma_type_1.time = HAL_GetTick();
+        packet_num_1++;
+    	packet_ma_type_1.num = packet_num_1;
+    	packet_ma_type_1.sum = Crc16((uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1) - 2);
+    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1));
+
+    	packet_ma_type_2.time = HAL_GetTick();
+        packet_num_2++;
+    	packet_ma_type_2.num = packet_num_2;
+    	packet_ma_type_2.sum = Crc16((uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2) - 2);
+    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2));
+
 
 	    switch (nrf24_state_now)
 	    {
 
 	        case STATE_BUILD_PACKET_MA_1_TO_GCS:
 	        	nrf24_fifo_flush_tx(&nrf24_api_config);
-	        	packet_ma_type_1.time = HAL_GetTick();
-	            packet_num_1++;
-	        	packet_ma_type_1.num = packet_num_1;
-	        	packet_ma_type_1.sum = Crc16((uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1) - 2);
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), false);
                 state_in_send_true = STATE_BUILD_PACKET_MA_2_TO_GCS;
                 state_in_send_false = STATE_BUILD_PACKET_MA_2_TO_GCS;
 			    nrf24_state_now = STATE_SEND;
 			    send_to_gcs_start_time = HAL_GetTick();
-				if(state_sd == FR_OK)
-				{
-					res = f_write (&testFile,  (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), &bw);
-				}
 
 		        // запись в файл (на sd контроллер пишет не сразу, а по закрытии файла. Также можно использовать эту команду)
 			    break;
 
 	        case STATE_BUILD_PACKET_MA_2_TO_GCS:
 	        	nrf24_fifo_flush_tx(&nrf24_api_config);
-	        	packet_ma_type_2.time = HAL_GetTick();
-	            packet_num_2++;
-	            packet_num_2++;
-	        	packet_ma_type_2.num = packet_num_2;
-	        	packet_ma_type_2.sum = Crc16((uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2) - 2);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), false);
                 state_in_send_true = STATE_BUILD_PACKET_TO_DA_1;
                 state_in_send_false = STATE_BUILD_PACKET_TO_DA_1;
 			    nrf24_state_now = STATE_SEND;
 			    send_to_gcs_start_time = HAL_GetTick();
-				if(state_sd == FR_OK)
-				{
-					res = f_write (&testFile,  (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &bw);
-				}
+
 				break;
 
 	        case STATE_SEND:
@@ -614,10 +639,6 @@ int app_main()
 	        		nrf24_fifo_flush_tx(&nrf24_api_config);
 					nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
 					nrf24_fifo_write(&nrf24_api_config, (uint8_t *)da_1_rx_buffer, packet_size, false);
-					if(state_sd == FR_OK)
-					{
-						res = f_write (&testFile, (uint8_t *)da_1_rx_buffer, packet_size, &bw);
-					}
 					send_to_gcs_start_time = HAL_GetTick();
 					state_in_send_true = state_in_send_false;
 					nrf24_state_now = STATE_SEND;
@@ -653,12 +674,6 @@ int app_main()
 			    break;
 
 	    }
-        if(HAL_GetTick() - timer_sync_start >= 2000 && state_sd == FR_OK)
-        {
-        	res = f_sync(&testFile);
-        	res = f_sync(&bme_hei_file);
-        	timer_sync_start = HAL_GetTick();
-        }
 	}
 
 	return 0;
