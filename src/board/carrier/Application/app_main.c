@@ -204,21 +204,25 @@ int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len)
 {
 	while(1)
 	{
-		static start_time;
-		static FATFS fileSystem; // переменная типа FATFS
-		static FIL testFile; // хендлер файла
-		static UINT bw;
-		static FRESULT res;
+		static start_time = {0};
+		static FATFS fileSystem = {0}; // переменная типа FATFS
+		static FIL testFile = {0}; // хендлер файла
+		static UINT bw = {0};
+		static FRESULT res = {0};
 		static int8_t state_sd = 0;
 		const char * path = "testFile.bin"; // название файла
-		const char * path1 = "bme_hei_file.csv"; // название файла
 
 		if(state_sd == 0)
 		{
 			led_sens_off(this, 8, 1);
 			FRESULT res = f_mount(&fileSystem, "", 1);
-			if(res == FR_OK){state_sd = 1;}
-			else return -1;
+			if(res == FR_OK){
+				state_sd = 1;
+			}
+			else {
+				res = f_mount(0, "", 1);
+				return -1;
+			}
 		}
 		if(state_sd == 1)
 		{
@@ -234,7 +238,7 @@ int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len)
 		if (state_sd == 2)
 		{
 			led_sens_on(this, 8, 1);
-            f_write (&testFile,  (uint8_t *)buf, len, &bw);
+			res = f_write (&testFile,  (uint8_t *)buf, len, &bw);
             if (HAL_GetTick() - start_time >= 750)
             {
             	res = f_sync(&testFile);
@@ -571,7 +575,6 @@ int app_main()
     	packet_ma_type_2.sum = Crc16((uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2) - 2);
     	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2));
 
-
 	    switch (nrf24_state_now)
 	    {
 
@@ -635,6 +638,7 @@ int app_main()
 	        	packet_size = nrf24_fifo_read(&nrf24_api_config, da_1_rx_buffer, sizeof(da_1_rx_buffer));
 	        	if (packet_size > 0)
 				{
+	        		super_smart_write(&shift_reg_sens, (uint8_t *)da_1_rx_buffer, packet_size);
 	        		led_nrf_change(&shift_reg_nrf, 7, 1);
 	        		nrf24_fifo_flush_tx(&nrf24_api_config);
 					nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
