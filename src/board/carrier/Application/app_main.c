@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stm32f4xx_hal.h>
 #include <stdio.h>
+#include <string.h>
 #include "motor.h"
 #include "triggers.h"
 #include "config.h"
@@ -30,7 +31,7 @@
 extern SPI_HandleTypeDef hspi2;
 extern ADC_HandleTypeDef hadc1;
 extern UART_HandleTypeDef huart6;
-
+extern IWDG_HandleTypeDef hiwdg;
 
 
 typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
@@ -204,23 +205,25 @@ int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len)
 {
 	while(1)
 	{
-		static start_time = {0};
-		static FATFS fileSystem = {0}; // переменная типа FATFS
-		static FIL testFile = {0}; // хендлер файла
-		static UINT bw = {0};
-		static FRESULT res = {0};
+		static uint32_t start_time;
+		static FATFS fileSystem; // переменная типа FATFS
+		static FIL testFile; // хендлер файла
+		static UINT bw;
+		static FRESULT res;
 		static int8_t state_sd = 0;
 		const char * path = "testFile.bin"; // название файла
 
 		if(state_sd == 0)
 		{
 			led_sens_off(this, 8, 1);
-			FRESULT res = f_mount(&fileSystem, "", 1);
-			if(res == FR_OK){
-				state_sd = 1;
-			}
-			else {
-				res = f_mount(0, "", 1);
+			extern Disk_drvTypeDef  disk;
+			disk.is_initialized[0] = 0;
+			memset(&fileSystem, 0x00, sizeof(fileSystem));
+			res = f_mount(&fileSystem, "0", 1);
+			if(res == FR_OK){state_sd = 1;}
+			else
+			{
+				res = f_mount(0, "0", 1);
 				return -1;
 			}
 		}
@@ -228,24 +231,24 @@ int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len)
 		{
 			led_sens_off(this, 8, 1);
 			res = f_open(&testFile, path, FA_WRITE | FA_OPEN_APPEND);
-			if(res == 0) state_sd = 2;
+			if(res == FR_OK) state_sd = 2;
 			else
 			{
 				state_sd = 0;
-				res = f_mount(0, "", 1);
+				res = f_mount(0, "0", 1);
 			}
 		}
 		if (state_sd == 2)
 		{
 			led_sens_on(this, 8, 1);
-			res = f_write (&testFile,  (uint8_t *)buf, len, &bw);
-            if (HAL_GetTick() - start_time >= 750)
+            res = f_write (&testFile,  (uint8_t *)buf, len, &bw);
+            if (HAL_GetTick() - start_time >= 10)
             {
             	res = f_sync(&testFile);
                 start_time  = HAL_GetTick();
             }
-	        if (res == 0) return 0;
-            if (res != 0)
+	        if (res == FR_OK) return 0;
+            if (res != FR_OK)
             {
     			res = f_close(&testFile);
             	state_sd = 1;
@@ -428,9 +431,10 @@ int app_main()
 	led_sens_on(&shift_reg_sens, 10, 1);
 	while(1)
 	{
-
+		HAL_IWDG_Refresh(&hiwdg);
 
         if(counter % 50 == 0) led_sens_change(&shift_reg_sens, 12, 1);
+        counter++;
         if (packet_ma_type_1.fix >= 1) led_sens_on(&shift_reg_sens, 11, 1);
 
 		comp_data = bme_read_data(&bme);
