@@ -22,10 +22,9 @@
 #include "buzzer.h"
 #include "led.h"
 
-#define NRF_BUTTON_PHOTORESISTOR_PIN GPIO_PIN_10
-#define NRF_BUTTON_PHOTORESISTOR_PORT GPIOB
 #define TIME_WAIT_BTN_PHOTOREZ 5000
 #define RADIO_TIMEOUT 2000
+#define RADIO_CHILL_TIMEOUT 0
 #define KOF 0.8
 #define HEIGHT_SEPARATION 200
 
@@ -44,7 +43,8 @@ typedef enum//ОПИСЫВАЕМ ОБЩЕНИЕ ПО РАДИО
 	STATE_SEND,
 	STATE_WRITE_DA_PACKET_TO_GCS,
 	STATE_BUILD_PACKET_TO_DA_2,
-	STATE_BUILD_PACKET_TO_DA_3
+	STATE_BUILD_PACKET_TO_DA_3,
+	STATE_CHILL
 }nrf24_state_t;
 
 typedef enum//ОПИСЫВАЕМ СОСТОЯНИЕ ПОЛЕТА
@@ -410,6 +410,7 @@ int app_main()
     uint32_t start_time_io = HAL_GetTick();
     int fix;
     int8_t state_sd = 0;
+    uint32_t start_time_sd;
 
     uint8_t state_in_send_true;
     uint8_t state_in_send_false;
@@ -439,7 +440,6 @@ int app_main()
 
         if(counter % 50 == 0) led_sens_change(&shift_reg_sens, 12, 1);
         counter++;
-        if (packet_ma_type_1.fix >= 1) led_sens_on(&shift_reg_sens, 11, 1);
 
 		comp_data = bme_read_data(&bme);
 		packet_ma_type_1.BME280_pressure = (float)comp_data.pressure;
@@ -482,13 +482,14 @@ int app_main()
 		packet_ma_type_1.latitude = lat;
 		packet_ma_type_1.longitude = lon;
 		packet_ma_type_1.height = (int16_t)(alt*100);
+		packet_ma_type_1.cookie = cookie;
 		height_on_BME280 = 44330.0*(1.0 - pow((float)packet_ma_type_1.BME280_pressure/pressure_on_ground, 1.0/5.255));
 		packet_ma_type_1.fix = fix;
         if (fix >= 1)
         {
-        	packet_ma_type_2.state |= 1 << 1;
-			led_sens_on(&shift_reg_sens, 8, 1);
+			led_sens_on(&shift_reg_sens, 11, 1);
         }
+        else led_sens_off(&shift_reg_sens, 11, 1);
 
 		packet_ma_type_2.phortsistor = photorezistor_get_lux(photoresistor);
 
@@ -575,18 +576,21 @@ int app_main()
 			break;
 		}
 
-    	packet_ma_type_1.time = HAL_GetTick();
-        packet_num_1++;
-    	packet_ma_type_1.num = packet_num_1;
-    	packet_ma_type_1.sum = Crc16((uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1) - 2);
-    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), &state_sd);
+		if (HAL_GetTick() - start_time_sd >= 10)
+		{
+			start_time_sd = HAL_GetTick();
+	    	packet_ma_type_1.time = HAL_GetTick();
+	        packet_num_1++;
+	    	packet_ma_type_1.num = packet_num_1;
+	    	packet_ma_type_1.sum = Crc16((uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1) - 2);
+	    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), &state_sd);
 
-    	packet_ma_type_2.time = HAL_GetTick();
-        packet_num_2++;
-    	packet_ma_type_2.num = packet_num_2;
-    	packet_ma_type_2.sum = Crc16((uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2) - 2);
-    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &state_sd);
-
+	    	packet_ma_type_2.time = HAL_GetTick();
+	        packet_num_2++;
+	    	packet_ma_type_2.num = packet_num_2;
+	    	packet_ma_type_2.sum = Crc16((uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2) - 2);
+	    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &state_sd);
+		}
 	    switch (nrf24_state_now)
 	    {
 
@@ -684,11 +688,16 @@ int app_main()
 	        	nrf24_pipe_set_tx_addr(&nrf24_api_config, pipe_config.address);
 			    nrf24_fifo_write(&nrf24_api_config, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), true);
                 state_in_send_true = STATE_WRITE_DA_PACKET_TO_GCS;
-                state_in_send_false = STATE_BUILD_PACKET_MA_1_TO_GCS;
+                state_in_send_false = STATE_CHILL;
 			    nrf24_state_now = STATE_SEND;
 			    send_to_gcs_start_time = HAL_GetTick();
 			    break;
 
+	        case STATE_CHILL:
+	            if(HAL_GetTick() > (send_to_gcs_start_time + RADIO_CHILL_TIMEOUT))
+	            {
+				    nrf24_state_now = STATE_BUILD_PACKET_MA_1_TO_GCS;
+	            }
 	    }
 	}
 
