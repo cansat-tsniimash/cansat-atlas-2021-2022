@@ -17,12 +17,13 @@
 #include "buzzer.h"
 #include "string.h"
 
-#define DA_NUM 1
+#define DA_NUM 3
 
 extern UART_HandleTypeDef huart3;
 
 extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
+extern IWDG_HandleTypeDef hiwdg;
 
 typedef struct reg_param_t
 {
@@ -142,7 +143,8 @@ int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len,
 		}
 		if(state_sd == 1)
 		{
-			res = f_open(&testFile, path, FA_WRITE | FA_OPEN_APPEND);
+			res = f_open(&testFile, path, FA_WRITE | FA_OPEN_ALWAYS);
+			f_lseek(&testFile, f_size(&testFile));
 			if(res == FR_OK) state_sd = 2;
 			else
 			{
@@ -166,17 +168,6 @@ int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len,
             }
 		}
 	}
-}
-
-unsigned short Crc16(unsigned char *buf, unsigned short len) {
-	unsigned short crc = 0xFFFF;
-	unsigned char i;
-	while (len--) {
-		crc ^= *buf++ << 8;
-		for (i = 0; i < 8; i++)
-			crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
-	}
-	return crc;
 }
 
 
@@ -271,7 +262,6 @@ unsigned short Crc16(unsigned char *buf, unsigned short len) {
 int app_main()
 {
 	bzr_off();
-	uint16_t timer_sync_start = HAL_GetTick();
     int8_t state_sd = 0;
 
 	//берем изначальное давление для барометрической формулы
@@ -372,6 +362,9 @@ int app_main()
 
 	uint32_t time_nrf_start = 0;
 
+	float lat ;
+	float lon;
+	float alt;
 	float temperature_celsius_gyro = 0;
     float acc_g [3];
     float gyro_dps [3];
@@ -380,10 +373,13 @@ int app_main()
     int fix2;
     uint32_t counter;
     uint8_t state_height = 0;
+    bool radio_flag;
 
 	float height_on_BME280 = 0;
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
 	while(true)
 	{
+		HAL_IWDG_Refresh(&hiwdg);
 		comp_data = bme_read_data(&bme);
 		packet_da_type_1.BME280_pressure = (uint32_t)comp_data.pressure;
 		packet_da_type_1.BME280_temperature = (int16_t)(comp_data.temperature*100);
@@ -396,6 +392,7 @@ int app_main()
 		if (state_height == 0 && height_on_BME280 > 500) state_height = 1;
 		counter++;
 		if (counter  % 50 == 0) HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
+		//if (packet_da_type_2.fix >= 1) HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
 
 		dump_registers(&nrf24_lower_api_config);
 
@@ -408,7 +405,10 @@ int app_main()
 
 
 		gps_work();
-		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height, &fix2);
+		gps_get_coords(&cookie,  & lat,  & lon,& alt, &fix2);
+		packet_da_type_2.latitude = lat;
+		packet_da_type_2.longitude = lon;
+		packet_da_type_2.height = (int16_t)(alt*100);
 		packet_da_type_2.fix = (uint8_t)fix2;
 
 		packet_da_type_1.time = HAL_GetTick();
@@ -422,16 +422,12 @@ int app_main()
 		packet_da_type_1.sum = Crc16((uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1) - 2);
 		packet_da_type_2.sum = Crc16((uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2) - 2);
 
-		if(state_sd == FR_OK)
-		{
-	    	super_smart_write(0, (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &state_sd);
-		}
 
-        if(HAL_GetTick() - timer_sync_start >= 2000 && res == FR_OK)
-        {
-        	f_sync(&testFile);
-        	timer_sync_start = HAL_GetTick();
-        }
+       	super_smart_write(0, (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &state_sd);
+       	super_smart_write(0, (uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2), &state_sd);
+
+
+
 
 		nrf24_fifo_status(&nrf24_lower_api_config, &rx_status, &tx_status);
 
