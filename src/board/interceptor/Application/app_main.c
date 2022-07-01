@@ -326,10 +326,6 @@ int app_main()
 	float height_on_BME280 = 0;
 	while(true)
 	{
-		gps_work();
-		gps_get_coords(&cookie, &packet_da_type_2.latitude, &packet_da_type_2.longitude, &packet_da_type_2.height, &fix2);
-		packet_da_type_2.fix = (uint8_t)fix2;
-
 		comp_data = bme_read_data(&bme);
 		packet_da_type_1.BME280_pressure = (uint32_t)comp_data.pressure;
 		packet_da_type_1.BME280_temperature = (int16_t)(comp_data.temperature*100);
