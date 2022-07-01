@@ -113,6 +113,76 @@ void print_bits(uint8_t value, char * buffer)
 	}
 }
 
+
+
+int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len, int8_t * state_sd_from_m)
+{
+	while(1)
+	{
+		static uint32_t start_time;
+		static FATFS fileSystem; // переменная типа FATFS
+		static FIL testFile; // хендлер файла
+		static UINT bw;
+		static FRESULT res;
+		static int8_t state_sd = 0;
+		const char * path = "testFile.bin"; // название файла
+
+		if(state_sd == 0)
+		{
+			extern Disk_drvTypeDef  disk;
+			disk.is_initialized[0] = 0;
+			memset(&fileSystem, 0x00, sizeof(fileSystem));
+			res = f_mount(&fileSystem, "0", 1);
+			if(res == FR_OK){state_sd = 1; *state_sd_from_m = state_sd;}
+			else
+			{
+				res = f_mount(0, "0", 1);
+				return -1;
+			}
+		}
+		if(state_sd == 1)
+		{
+			res = f_open(&testFile, path, FA_WRITE | FA_OPEN_APPEND);
+			if(res == FR_OK) state_sd = 2;
+			else
+			{
+				state_sd = 0;
+				res = f_mount(0, "0", 1);
+			}
+		}
+		if (state_sd == 2)
+		{
+            res = f_write (&testFile,  (uint8_t *)buf, len, &bw);
+            if (HAL_GetTick() - start_time >= 10)
+            {
+            	res = f_sync(&testFile);
+                start_time  = HAL_GetTick();
+            }
+	        if (res == FR_OK) return 0;
+            if (res != FR_OK)
+            {
+    			res = f_close(&testFile);
+            	state_sd = 1;
+            }
+		}
+	}
+}
+
+unsigned short Crc16(unsigned char *buf, unsigned short len) {
+	unsigned short crc = 0xFFFF;
+	unsigned char i;
+	while (len--) {
+		crc ^= *buf++ << 8;
+		for (i = 0; i < 8; i++)
+			crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
+	}
+	return crc;
+}
+
+
+
+
+
 static void print_register(uint8_t reg_addr, uint8_t * reg_data, char * buffer, size_t buffer_size)
 {
 	reg_param_t * selected_param = NULL;
@@ -202,19 +272,7 @@ int app_main()
 {
 	bzr_off();
 	uint16_t timer_sync_start = HAL_GetTick();
-    uint8_t state_sd = 88;
-
-    bool radio_flag = true;
-	FATFS fileSystem; // переменная типа FATFS
-	FIL testFile; // хендлер файла
-	UINT bw; // количество символов, реально записанных внутрь файла
-	FRESULT res = FR_INT_ERR; // результат выполнения функции
-
-	if((state_sd = f_mount(&fileSystem, "", 1)) == FR_OK) { // монтируете файловую систему по пути SDPath, проверяете, что она смонтировалась, только при этом условии начинаете с ней работать
-		const char * path = "testfile_da2.bin"; // название файла
-		res = f_open(&testFile, path,  FA_WRITE | FA_CREATE_ALWAYS); // открытие файла, обязательно для работы с ним
-	}
-	printf("open res %d\n", (int)res);
+    int8_t state_sd = 0;
 
 	//берем изначальное давление для барометрической формулы
 	uint32_t pressure_on_ground;
@@ -366,8 +424,7 @@ int app_main()
 
 		if(state_sd == FR_OK)
 		{
-			res = f_write (&testFile,  (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &bw);
-			res = f_write (&testFile,  (uint8_t *)&packet_da_type_2, sizeof(packet_da_type_2), &bw);
+	    	super_smart_write(0, (uint8_t *)&packet_da_type_1, sizeof(packet_da_type_1), &state_sd);
 		}
 
         if(HAL_GetTick() - timer_sync_start >= 2000 && res == FR_OK)

@@ -202,7 +202,7 @@ static void dump_registers(void *intf_ptr)
 	}
 }
 
-int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len)
+int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len, int8_t * state_sd_from_m)
 {
 	while(1)
 	{
@@ -221,7 +221,7 @@ int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len)
 			disk.is_initialized[0] = 0;
 			memset(&fileSystem, 0x00, sizeof(fileSystem));
 			res = f_mount(&fileSystem, "0", 1);
-			if(res == FR_OK){state_sd = 1;}
+			if(res == FR_OK){state_sd = 1; *state_sd_from_m = state_sd;}
 			else
 			{
 				res = f_mount(0, "0", 1);
@@ -230,6 +230,7 @@ int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len)
 		}
 		if(state_sd == 1)
 		{
+			 *state_sd_from_m = state_sd;
 			led_sens_off(this, 8, 1);
 			res = f_open(&testFile, path, FA_WRITE | FA_OPEN_APPEND);
 			if(res == FR_OK) state_sd = 2;
@@ -241,6 +242,7 @@ int super_smart_write(shift_reg_t *this, unsigned char *buf, unsigned short len)
 		}
 		if (state_sd == 2)
 		{
+			 *state_sd_from_m = state_sd;
 			led_sens_on(this, 8, 1);
             res = f_write (&testFile,  (uint8_t *)buf, len, &bw);
             if (HAL_GetTick() - start_time >= 10)
@@ -407,6 +409,7 @@ int app_main()
     bool crc_ok_ds;
     uint32_t start_time_io = HAL_GetTick();
     int fix;
+    int8_t state_sd = 0;
 
     uint8_t state_in_send_true;
     uint8_t state_in_send_false;
@@ -576,13 +579,13 @@ int app_main()
         packet_num_1++;
     	packet_ma_type_1.num = packet_num_1;
     	packet_ma_type_1.sum = Crc16((uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1) - 2);
-    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1));
+    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_1, sizeof(packet_ma_type_1), &state_sd);
 
     	packet_ma_type_2.time = HAL_GetTick();
         packet_num_2++;
     	packet_ma_type_2.num = packet_num_2;
     	packet_ma_type_2.sum = Crc16((uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2) - 2);
-    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2));
+    	super_smart_write(&shift_reg_sens, (uint8_t *)&packet_ma_type_2, sizeof(packet_ma_type_2), &state_sd);
 
 	    switch (nrf24_state_now)
 	    {
@@ -647,7 +650,7 @@ int app_main()
 	        	packet_size = nrf24_fifo_read(&nrf24_api_config, da_1_rx_buffer, sizeof(da_1_rx_buffer));
 	        	if (packet_size > 0)
 				{
-	        		super_smart_write(&shift_reg_sens, (uint8_t *)da_1_rx_buffer, packet_size);
+	        		super_smart_write(&shift_reg_sens, (uint8_t *)da_1_rx_buffer, packet_size, &state_sd);
 	        		led_nrf_change(&shift_reg_nrf, 7, 1);
 	        		nrf24_fifo_flush_tx(&nrf24_api_config);
 					nrf24_pipe_set_tx_addr(&nrf24_api_config, 0x123456789a);
