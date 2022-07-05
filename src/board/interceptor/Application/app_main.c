@@ -17,7 +17,7 @@
 #include "buzzer.h"
 #include "string.h"
 
-#define DA_NUM 3
+#define DA_NUM 2
 
 extern UART_HandleTypeDef huart3;
 
@@ -314,7 +314,7 @@ int app_main()
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
 	nrf24_rf_config.rf_channel = 100;
-	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_18_DBM;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
 	nrf24_setup_rf(&nrf24_lower_api_config, &nrf24_rf_config);
 
 	// Настроили протокол
@@ -391,8 +391,7 @@ int app_main()
 
 		if (state_height == 0 && height_on_BME280 > 500) state_height = 1;
 		counter++;
-		if (counter  % 50 == 0) HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
-		//if (packet_da_type_2.fix >= 1) HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+		if (counter  % 20 == 0) HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
 
 		dump_registers(&nrf24_lower_api_config);
 

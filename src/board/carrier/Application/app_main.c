@@ -332,7 +332,7 @@ int app_main()
 	nrf24_rf_config_t nrf24_rf_config;
 	nrf24_rf_config.data_rate = NRF24_DATARATE_250_KBIT;
 	nrf24_rf_config.rf_channel = 100;
-	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_18_DBM;
+	nrf24_rf_config.tx_power = NRF24_TXPOWER_MINUS_0_DBM;
 	nrf24_setup_rf(&nrf24_api_config, &nrf24_rf_config);
 
 	// Настроили протокол
@@ -418,7 +418,6 @@ int app_main()
     uint32_t counter = 0;
 
     uint32_t send_to_gcs_start_time = 0;
-	//motor_on();
 
     lisset_sr(&lis3mdl_ctx, &lis_interface);
 

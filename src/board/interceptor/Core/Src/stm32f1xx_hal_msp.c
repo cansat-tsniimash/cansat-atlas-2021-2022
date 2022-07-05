@@ -254,6 +254,8 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     HAL_NVIC_SetPriority(USART3_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(USART3_IRQn);
   /* USER CODE BEGIN USART3_MspInit 1 */
+    // Баним TX потому что он нам не нужен и похоже коротит с RX
+    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10);
 
   /* USER CODE END USART3_MspInit 1 */
   }
